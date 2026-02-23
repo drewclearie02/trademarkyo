@@ -41,7 +41,6 @@ async function launchBrowser() {
   });
 }
 
-// Navigate directly to USPTO's trademark search app and use its search box
 async function scrapeUsptoTrademark(markName) {
   const browser = await launchBrowser();
   const results = [];
@@ -52,119 +51,137 @@ async function scrapeUsptoTrademark(markName) {
     page.setDefaultTimeout(60000);
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
 
-    // Go directly to the trademark search tool (not the main USPTO site search)
-    const url = `https://tsdr.uspto.gov/#caseNumber=${encodeURIComponent(markName)}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch`;
-    console.log('[scrape] Trying TSDR direct URL...');
-
-    // Actually use the proper trademark search
-    // The new USPTO search is at tmsearch.uspto.gov
     await page.goto('https://tmsearch.uspto.gov/search/search-information', {
       waitUntil: 'networkidle2', timeout: 45000
     });
     await sleep(2000);
 
-    console.log('[scrape] URL:', page.url());
-    console.log('[scrape] Title:', await page.title());
+    // Type into the search bar (id="searchbar")
+    await page.waitForSelector('#searchbar', { timeout: 10000 });
+    await page.click('#searchbar');
+    await page.keyboard.down('Control');
+    await page.keyboard.press('a');
+    await page.keyboard.up('Control');
+    await page.type('#searchbar', markName.toUpperCase(), { delay: 50 });
+    console.log('[scrape] Typed mark:', markName.toUpperCase());
 
-    const inputInfo = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('input')).map(i => ({ name: i.name, id: i.id, placeholder: i.placeholder, type: i.type, class: i.className.substring(0,50) }))
-    );
-    console.log('[scrape] Inputs:', JSON.stringify(inputInfo));
-
-    // Find and fill the mark search input
-    const searchSelectors = [
-      'input[id*="mark"]',
-      'input[name*="mark"]',
-      'input[placeholder*="mark" i]',
-      'input[placeholder*="trademark" i]',
-      'input[placeholder*="search" i]',
-      'input[type="text"]:not([type="hidden"])',
-      'input[type="search"]',
-    ];
-
-    let typed = false;
-    for (const sel of searchSelectors) {
-      try {
-        const el = await page.$(sel);
-        if (!el) continue;
-        await el.click();
-        await page.keyboard.down('Control');
-        await page.keyboard.press('a');
-        await page.keyboard.up('Control');
-        await el.type(markName.toUpperCase(), { delay: 50 });
-        console.log('[scrape] Typed into:', sel);
-        typed = true;
-        break;
-      } catch (e) {
-        console.log('[scrape] Selector failed:', sel, e.message.substring(0, 50));
-      }
-    }
-
-    if (!typed) {
-      const html = await page.content();
-      console.log('[scrape] No input found. HTML (first 800):', html.substring(0, 800));
-      throw new Error('Could not find search input');
-    }
-
-    // Submit
+    // Click the search button
     const btnClicked = await page.evaluate(() => {
-      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
-      const searchBtn = btns.find(b => (b.textContent || b.value || '').toLowerCase().includes('search'));
+      const btns = Array.from(document.querySelectorAll('button, mat-icon'));
+      const searchBtn = btns.find(b => (b.textContent || '').trim().toLowerCase() === 'search');
       if (searchBtn) { searchBtn.click(); return true; }
+      // Try clicking button near the input
+      const inputParent = document.querySelector('#searchbar')?.closest('form, mat-form-field, div');
+      const btn = inputParent?.querySelector('button');
+      if (btn) { btn.click(); return true; }
       return false;
     });
     if (!btnClicked) await page.keyboard.press('Enter');
-    console.log('[scrape] Submitted, btn clicked:', btnClicked);
+    console.log('[scrape] Search submitted');
 
-    await sleep(5000);
-    console.log('[scrape] Post-search URL:', page.url());
+    // Wait for results to load — wait for result cards to appear
+    console.log('[scrape] Waiting for results...');
+    await sleep(3000);
 
-    const pageText = await page.evaluate(() => document.body?.innerText || '');
-    console.log('[scrape] Results text (first 800):', pageText.substring(0, 800));
+    // Wait for actual trademark result elements
+    // tmsearch.uspto.gov uses Angular Material — results appear as mat-card or similar
+    try {
+      await page.waitForFunction(() => {
+        // Look for elements containing 8-digit serial numbers (trademark serials)
+        const body = document.body.innerText;
+        return body.match(/\b\d{8}\b/) || document.querySelectorAll('[class*="result-item"], [class*="trademark-result"], mat-card, .result-row').length > 0;
+      }, { timeout: 10000 });
+      console.log('[scrape] Results appeared');
+    } catch {
+      console.log('[scrape] Timeout waiting for results, proceeding anyway');
+    }
 
-    // Extract trademark records - look for serial numbers and mark names
+    await sleep(2000);
+
+    // Log all class names on the page to identify result containers
+    const classNames = await page.evaluate(() => {
+      const classes = new Set();
+      document.querySelectorAll('*').forEach(el => {
+        el.className && String(el.className).split(' ').forEach(c => c && classes.add(c));
+      });
+      return Array.from(classes).filter(c => c.length > 3 && c.length < 50).slice(0, 80);
+    });
+    console.log('[scrape] Page classes:', classNames.join(', '));
+
+    // Get full page text to find serial numbers
+    const fullText = await page.evaluate(() => document.body?.innerText || '');
+    console.log('[scrape] Full page text (first 1500):', fullText.substring(0, 1500));
+
+    // Extract all 8-digit serial numbers from the page
+    const serialMatches = [...fullText.matchAll(/\b(\d{8})\b/g)].map(m => m[1]);
+    const uniqueSerials = [...new Set(serialMatches)].slice(0, 15);
+    console.log('[scrape] Serials found:', uniqueSerials);
+
+    // Try to extract structured data from result rows
     const rawData = await page.evaluate(() => {
-      const rows = [];
+      const items = [];
 
-      // Try table rows
-      document.querySelectorAll('tr').forEach(tr => {
-        const text = (tr.innerText || '').replace(/\s+/g, ' ').trim();
-        if (text.length < 5) return;
-        const serial = text.match(/\b(\d{8})\b/)?.[1];
-        if (serial || text.length > 20) {
-          rows.push({ text: text.substring(0, 400), serial: serial || null });
+      // Try various Angular Material / custom selectors
+      const selectors = [
+        'app-result-item', 'app-search-result', 'app-trademark-result',
+        '[class*="result-item"]', '[class*="search-result"]',
+        'mat-list-item', 'mat-card',
+        'tbody tr', 'table tr',
+        '[role="listitem"]', '[role="row"]',
+      ];
+
+      for (const sel of selectors) {
+        const els = document.querySelectorAll(sel);
+        if (els.length > 0) {
+          console.log('Found', els.length, 'elements with selector:', sel);
+          els.forEach(el => {
+            const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (text.length < 5) return;
+            const serial = text.match(/\b(\d{8})\b/)?.[1];
+            items.push({ text: text.substring(0, 500), serial: serial || null, selector: sel });
+          });
+          if (items.length > 2) break;
         }
-      });
+      }
 
-      if (rows.length > 2) return rows.slice(0, 15);
-
-      // Try list items / cards
-      const cards = document.querySelectorAll('[class*="result"], [class*="record"], [class*="item"], [class*="card"], li');
-      cards.forEach(c => {
-        const text = (c.innerText || '').replace(/\s+/g, ' ').trim();
-        if (text.length < 10) return;
-        const serial = text.match(/\b(\d{8})\b/)?.[1];
-        rows.push({ text: text.substring(0, 400), serial: serial || null });
-      });
-
-      return rows.slice(0, 15);
+      return items.slice(0, 20);
     });
 
-    console.log(`[scrape] Raw rows: ${rawData.length}`);
-    if (rawData[0]) console.log('[scrape] Sample:', JSON.stringify(rawData[0]).substring(0, 200));
+    console.log(`[scrape] Structured items: ${rawData.length}`);
+    if (rawData[0]) console.log('[scrape] First item:', JSON.stringify(rawData[0]).substring(0, 300));
 
-    for (const r of rawData) {
-      if (!r.text || r.text.length < 5) continue;
-      results.push({
-        source: 'tmsearch_scrape',
-        serialNumber: r.serial,
-        liveDeadStatus: r.text.toUpperCase().includes('DEAD') || r.text.toUpperCase().includes('ABANDON') ? 'DEAD' : 'LIVE',
-        markName: null,
-        owner: null,
-        goodsServices: r.text,
-        filingDate: null,
-        registrationDate: null,
-      });
+    // If we found structured items with serials, use them
+    const itemsWithSerials = rawData.filter(r => r.serial);
+    if (itemsWithSerials.length > 0) {
+      for (const r of itemsWithSerials) {
+        results.push({
+          source: 'tmsearch',
+          serialNumber: r.serial,
+          liveDeadStatus: /dead|abandon|cancel/i.test(r.text) ? 'DEAD' : 'LIVE',
+          markName: null,
+          owner: null,
+          goodsServices: r.text,
+          filingDate: null,
+          registrationDate: null,
+        });
+      }
+    } else if (uniqueSerials.length > 0) {
+      // Fallback: use serial numbers found in page text
+      // Build context around each serial
+      for (const serial of uniqueSerials) {
+        const idx = fullText.indexOf(serial);
+        const context = fullText.substring(Math.max(0, idx - 100), idx + 200);
+        results.push({
+          source: 'tmsearch',
+          serialNumber: serial,
+          liveDeadStatus: /dead|abandon|cancel/i.test(context) ? 'DEAD' : 'LIVE',
+          markName: null,
+          owner: null,
+          goodsServices: context.replace(/\s+/g, ' ').trim(),
+          filingDate: null,
+          registrationDate: null,
+        });
+      }
     }
 
     await page.close();
@@ -199,7 +216,6 @@ async function callClaude({ markName, results }) {
   if (!resp.ok) throw new Error(`Claude API (${resp.status}): ${truncate(text, 250)}`);
   const parsed = safeJsonParse(text);
   const rawContent = parsed?.content?.[0]?.text || '';
-  console.log('[claude] Response start:', rawContent.substring(0, 150));
   const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
   const result = safeJsonParse(stripped);
   if (!result) throw new Error('Claude returned invalid JSON');
