@@ -15,7 +15,13 @@ const PORT = Number(process.env.PORT || 8080);
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function truncate(s, n) { const str = String(s || ''); return str.length > n ? str.slice(0, n - 1) + '…' : str; }
-function safeJsonParse(text) { try { return JSON.parse(text); } catch { return null; } }
+
+function safeJsonParse(text) {
+  if (!text) return null;
+  // Strip markdown code fences if present
+  const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+  try { return JSON.parse(cleaned); } catch { return null; }
+}
 
 function findChrome() {
   const env = process.env.CHROME_PATH;
@@ -23,12 +29,12 @@ function findChrome() {
   for (const p of ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']) {
     if (fs.existsSync(p)) return p;
   }
-  throw new Error('Chrome not found. Checked: /usr/bin/chromium, /usr/bin/chromium-browser, /usr/bin/google-chrome');
+  throw new Error('Chrome not found');
 }
 
 async function launchBrowser() {
   const executablePath = findChrome();
-  console.log('[browser] Using chrome at:', executablePath);
+  console.log('[browser] Chrome:', executablePath);
   return puppeteer.launch({
     executablePath,
     headless: true,
@@ -46,13 +52,13 @@ async function scrapeTess(markName) {
     page.setDefaultTimeout(45000);
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
 
-    console.log('[tess] Loading TESS search page...');
+    console.log('[tess] Navigating to TESS...');
     await page.goto('https://tess2.uspto.gov/bin/gate.exe?f=searchss&state=4802:n19s2n.1.1', {
       waitUntil: 'domcontentloaded', timeout: 30000
     });
 
     const query = `*${markName.toUpperCase().trim()}*[COMB]`;
-    console.log('[tess] Submitting query:', query);
+    console.log('[tess] Query:', query);
 
     await page.waitForSelector('input[name="p_s_All"]', { timeout: 15000 });
     await page.click('input[name="p_s_All"]');
@@ -68,61 +74,55 @@ async function scrapeTess(markName) {
 
     await sleep(1500);
 
-    const pageHtml = await page.content();
     const pageText = await page.evaluate(() => document.body ? document.body.innerText : '');
-    console.log('[tess] Results page length:', pageHtml.length, '| Text sample:', pageText.substring(0, 200));
+    console.log('[tess] Page text (first 400 chars):', pageText.substring(0, 400));
 
     if (pageText.includes('No TESS records') || pageText.includes('0 records')) {
-      console.log('[tess] Zero records returned by TESS');
+      console.log('[tess] TESS returned 0 records');
       return [];
     }
 
-    // Extract result rows - TESS shows a table with serial number, reg number, live/dead, mark
     const rawRows = await page.evaluate(() => {
       const rows = [];
-
-      // Primary: table rows with 8-digit serial numbers
       document.querySelectorAll('tr').forEach(tr => {
         const text = tr.innerText || '';
-        const serialMatch = text.match(/\b(\d{8})\b/);
-        if (!serialMatch) return;
-
+        const m = text.match(/\b(\d{8})\b/);
+        if (!m) return;
         const link = tr.querySelector('a[href]');
         rows.push({
-          serial: serialMatch[1],
+          serial: m[1],
           text: text.replace(/\s+/g, ' ').trim(),
           href: link ? link.getAttribute('href') : null,
           cells: Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
         });
       });
 
-      // Fallback: any links with serial numbers in href or text
       if (rows.length === 0) {
         document.querySelectorAll('a[href]').forEach(a => {
           const href = a.getAttribute('href') || '';
           const text = a.innerText.trim();
-          const combined = href + ' ' + text;
-          const m = combined.match(/\b(\d{8})\b/);
+          const m = (href + ' ' + text).match(/\b(\d{8})\b/);
           if (m && (href.includes('f=doc') || href.includes('serial'))) {
             rows.push({ serial: m[1], text, href, cells: [text] });
           }
         });
       }
-
       return rows;
     });
 
-    console.log(`[tess] Extracted ${rawRows.length} result rows`);
+    console.log(`[tess] Found ${rawRows.length} result rows`);
 
     if (rawRows.length === 0) {
-      throw new Error(`TESS returned no parseable rows. Page text: ${pageText.substring(0, 300)}`);
+      // Log full page HTML for debugging
+      const html = await page.content();
+      console.log('[tess] Full page HTML (first 800):', html.substring(0, 800));
+      throw new Error('No result rows found in TESS page');
     }
 
-    // Fetch detail pages for top 10
     const baseUrl = page.url();
     for (const row of rawRows.slice(0, 10)) {
       try {
-        let detailUrl = row.href
+        const detailUrl = row.href
           ? new URL(row.href, baseUrl).toString()
           : `https://tess2.uspto.gov/bin/showfield?f=doc&state=4802:n19s2n.2.1&p_serial=${row.serial}`;
 
@@ -160,7 +160,7 @@ async function scrapeTess(markName) {
         await dp.close();
         await sleep(150);
       } catch (e) {
-        console.error('[tess] Detail error for', row.serial, ':', e.message);
+        console.error('[tess] Detail error for serial', row.serial, ':', e.message);
         results.push({
           source: 'tess_basic',
           serialNumber: row.serial,
@@ -172,7 +172,7 @@ async function scrapeTess(markName) {
     }
 
     await page.close();
-    console.log(`[tess] Done. Returning ${results.length} results`);
+    console.log(`[tess] Returning ${results.length} results`);
     return results;
 
   } finally {
@@ -189,23 +189,30 @@ async function callClaude({ markName, results }) {
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
+      max_tokens: 1200,
       temperature: 0.2,
-      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. Return ONLY valid JSON, no markdown.',
+      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. You MUST return ONLY a raw JSON object. Do NOT use markdown code fences. Do NOT include any text before or after the JSON.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nReturn JSON: {"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
+        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records (${results.length} found):\n${JSON.stringify(results, null, 2)}\n\nRespond with ONLY this JSON object (no markdown, no explanation):\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
       }]
     })
   });
 
   const text = await resp.text();
   if (!resp.ok) throw new Error(`Claude API (${resp.status}): ${truncate(text, 250)}`);
+
   const parsed = safeJsonParse(text);
-  const content = parsed?.content?.[0]?.text;
-  if (!content) throw new Error('Claude response missing content');
-  const result = safeJsonParse(content);
-  if (!result) throw new Error('Claude returned invalid JSON');
+  const rawContent = parsed?.content?.[0]?.text || '';
+  console.log('[claude] Raw response (first 200):', rawContent.substring(0, 200));
+
+  // Strip markdown fences and parse
+  const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+  const result = safeJsonParse(stripped);
+  if (!result) {
+    console.error('[claude] Failed to parse JSON. Raw:', rawContent.substring(0, 500));
+    throw new Error('Claude returned invalid JSON');
+  }
   return result;
 }
 
@@ -217,7 +224,7 @@ app.post('/api/search', async (req, res) => {
     const results = await scrapeTess(markName);
     return res.json({ mode: 'tess_scrape', results, meta: { markName } });
   } catch (e) {
-    console.error('[search] Failed:', e.message);
+    console.error('[search] TESS failed:', e.message);
     return res.json({ mode: 'ai_only', results: [], meta: { markName, error: e.message } });
   }
 });
