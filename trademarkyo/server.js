@@ -41,7 +41,8 @@ async function launchBrowser() {
   });
 }
 
-async function scrapeUsptoSearch(markName) {
+// Navigate directly to USPTO's trademark search app and use its search box
+async function scrapeUsptoTrademark(markName) {
   const browser = await launchBrowser();
   const results = [];
 
@@ -51,129 +52,118 @@ async function scrapeUsptoSearch(markName) {
     page.setDefaultTimeout(60000);
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
 
-    // USPTO's new trademark search
-    const searchUrl = `https://www.uspto.gov/trademarks/search`;
-    console.log('[scrape] Navigating to USPTO trademark search...');
-    await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+    // Go directly to the trademark search tool (not the main USPTO site search)
+    const url = `https://tsdr.uspto.gov/#caseNumber=${encodeURIComponent(markName)}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch`;
+    console.log('[scrape] Trying TSDR direct URL...');
+
+    // Actually use the proper trademark search
+    // The new USPTO search is at tmsearch.uspto.gov
+    await page.goto('https://tmsearch.uspto.gov/search/search-information', {
+      waitUntil: 'networkidle2', timeout: 45000
+    });
     await sleep(2000);
 
-    console.log('[scrape] Page title:', await page.title());
     console.log('[scrape] URL:', page.url());
+    console.log('[scrape] Title:', await page.title());
 
-    // Find search input
-    const inputInfo = await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="search"], input:not([type="hidden"])'));
-      return inputs.map(i => ({ name: i.name, id: i.id, placeholder: i.placeholder, type: i.type }));
-    });
+    const inputInfo = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('input')).map(i => ({ name: i.name, id: i.id, placeholder: i.placeholder, type: i.type, class: i.className.substring(0,50) }))
+    );
     console.log('[scrape] Inputs:', JSON.stringify(inputInfo));
 
-    // Type in the search box - try multiple selectors
+    // Find and fill the mark search input
     const searchSelectors = [
-      'input[placeholder*="Search"]',
-      'input[placeholder*="trademark"]',
-      'input[placeholder*="mark"]',
-      'input[type="search"]',
-      'input[id*="search"]',
-      'input[name*="search"]',
+      'input[id*="mark"]',
+      'input[name*="mark"]',
+      'input[placeholder*="mark" i]',
+      'input[placeholder*="trademark" i]',
+      'input[placeholder*="search" i]',
       'input[type="text"]:not([type="hidden"])',
+      'input[type="search"]',
     ];
 
     let typed = false;
     for (const sel of searchSelectors) {
       try {
-        await page.waitForSelector(sel, { timeout: 3000 });
-        await page.click(sel);
+        const el = await page.$(sel);
+        if (!el) continue;
+        await el.click();
         await page.keyboard.down('Control');
         await page.keyboard.press('a');
         await page.keyboard.up('Control');
-        await page.type(sel, markName.toUpperCase(), { delay: 50 });
+        await el.type(markName.toUpperCase(), { delay: 50 });
         console.log('[scrape] Typed into:', sel);
         typed = true;
         break;
-      } catch {}
+      } catch (e) {
+        console.log('[scrape] Selector failed:', sel, e.message.substring(0, 50));
+      }
     }
 
     if (!typed) {
       const html = await page.content();
-      console.log('[scrape] Could not find input. HTML snippet:', html.substring(0, 600));
-      throw new Error('Could not find search input on USPTO search page');
+      console.log('[scrape] No input found. HTML (first 800):', html.substring(0, 800));
+      throw new Error('Could not find search input');
     }
 
-    await sleep(500);
-    await page.keyboard.press('Enter');
-    console.log('[scrape] Submitted search');
+    // Submit
+    const btnClicked = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, input[type="submit"]'));
+      const searchBtn = btns.find(b => (b.textContent || b.value || '').toLowerCase().includes('search'));
+      if (searchBtn) { searchBtn.click(); return true; }
+      return false;
+    });
+    if (!btnClicked) await page.keyboard.press('Enter');
+    console.log('[scrape] Submitted, btn clicked:', btnClicked);
 
-    // Wait for results to load
     await sleep(5000);
     console.log('[scrape] Post-search URL:', page.url());
 
-    const pageText = await page.evaluate(() => document.body ? document.body.innerText : '');
-    console.log('[scrape] Results page text (first 600):', pageText.substring(0, 600));
+    const pageText = await page.evaluate(() => document.body?.innerText || '');
+    console.log('[scrape] Results text (first 800):', pageText.substring(0, 800));
 
-    // Extract results - the new USPTO search renders results as cards/rows
-    const rawResults = await page.evaluate(() => {
-      const results = [];
+    // Extract trademark records - look for serial numbers and mark names
+    const rawData = await page.evaluate(() => {
+      const rows = [];
 
-      // Try to find result items - USPTO new UI uses various structures
-      const selectors = [
-        '[data-testid*="result"]',
-        '[class*="result"]',
-        '[class*="trademark"]',
-        'table tr',
-        '[role="row"]',
-        'li[class*="item"]',
-      ];
-
-      for (const sel of selectors) {
-        const items = document.querySelectorAll(sel);
-        if (items.length > 1) {
-          items.forEach(item => {
-            const text = item.innerText || item.textContent || '';
-            if (!text.trim() || text.length < 5) return;
-            // Look for serial numbers (8 digits)
-            const serialMatch = text.match(/\b(\d{8})\b/);
-            results.push({
-              text: text.replace(/\s+/g, ' ').trim().substring(0, 300),
-              serial: serialMatch ? serialMatch[1] : null,
-              selector: sel
-            });
-          });
-          if (results.length > 0) break;
+      // Try table rows
+      document.querySelectorAll('tr').forEach(tr => {
+        const text = (tr.innerText || '').replace(/\s+/g, ' ').trim();
+        if (text.length < 5) return;
+        const serial = text.match(/\b(\d{8})\b/)?.[1];
+        if (serial || text.length > 20) {
+          rows.push({ text: text.substring(0, 400), serial: serial || null });
         }
-      }
+      });
 
-      // Fallback: grab all text with serial-number patterns
-      if (results.length === 0) {
-        const allText = document.body ? document.body.innerText : '';
-        const lines = allText.split('\n').filter(l => l.match(/\b\d{8}\b/));
-        lines.forEach(line => {
-          const m = line.match(/\b(\d{8})\b/);
-          if (m) results.push({ text: line.trim(), serial: m[1], selector: 'text_parse' });
-        });
-      }
+      if (rows.length > 2) return rows.slice(0, 15);
 
-      return results.slice(0, 15);
+      // Try list items / cards
+      const cards = document.querySelectorAll('[class*="result"], [class*="record"], [class*="item"], [class*="card"], li');
+      cards.forEach(c => {
+        const text = (c.innerText || '').replace(/\s+/g, ' ').trim();
+        if (text.length < 10) return;
+        const serial = text.match(/\b(\d{8})\b/)?.[1];
+        rows.push({ text: text.substring(0, 400), serial: serial || null });
+      });
+
+      return rows.slice(0, 15);
     });
 
-    console.log(`[scrape] Found ${rawResults.length} raw results`);
-    if (rawResults.length > 0) {
-      console.log('[scrape] Sample result:', JSON.stringify(rawResults[0]));
-    }
+    console.log(`[scrape] Raw rows: ${rawData.length}`);
+    if (rawData[0]) console.log('[scrape] Sample:', JSON.stringify(rawData[0]).substring(0, 200));
 
-    // Convert to structured format
-    for (const r of rawResults) {
-      const isLive = !r.text.toUpperCase().includes('DEAD') && !r.text.toUpperCase().includes('ABANDONED');
+    for (const r of rawData) {
+      if (!r.text || r.text.length < 5) continue;
       results.push({
-        source: 'uspto_scrape',
+        source: 'tmsearch_scrape',
         serialNumber: r.serial,
-        liveDeadStatus: isLive ? 'LIVE' : 'DEAD',
-        markName: null, // Will be filled by detail if possible
+        liveDeadStatus: r.text.toUpperCase().includes('DEAD') || r.text.toUpperCase().includes('ABANDON') ? 'DEAD' : 'LIVE',
+        markName: null,
         owner: null,
         goodsServices: r.text,
         filingDate: null,
         registrationDate: null,
-        detailUrl: null,
-        rawText: r.text,
       });
     }
 
@@ -197,21 +187,19 @@ async function callClaude({ markName, results }) {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1200,
       temperature: 0.2,
-      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. Return ONLY a raw JSON object. No markdown fences. No explanation.',
+      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. Return ONLY a raw JSON object. No markdown. No explanation.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records (${results.length} found):\n${JSON.stringify(results, null, 2)}\n\nReturn ONLY this JSON (no markdown):\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
+        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records (${results.length} found):\n${JSON.stringify(results, null, 2)}\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
       }]
     })
   });
 
   const text = await resp.text();
   if (!resp.ok) throw new Error(`Claude API (${resp.status}): ${truncate(text, 250)}`);
-
   const parsed = safeJsonParse(text);
   const rawContent = parsed?.content?.[0]?.text || '';
-  console.log('[claude] Raw response (first 200):', rawContent.substring(0, 200));
-
+  console.log('[claude] Response start:', rawContent.substring(0, 150));
   const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
   const result = safeJsonParse(stripped);
   if (!result) throw new Error('Claude returned invalid JSON');
@@ -222,10 +210,10 @@ app.post('/api/search', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
   if (!markName) return res.status(400).json({ error: 'markName required' });
   try {
-    const results = await scrapeUsptoSearch(markName);
-    return res.json({ mode: results.length > 0 ? 'uspto_scrape' : 'ai_only', results, meta: { markName } });
+    const results = await scrapeUsptoTrademark(markName);
+    return res.json({ mode: results.length > 0 ? 'tess_scrape' : 'ai_only', results, meta: { markName } });
   } catch (e) {
-    console.error('[search] Scrape failed:', e.message);
+    console.error('[search] Failed:', e.message);
     return res.json({ mode: 'ai_only', results: [], meta: { markName, error: e.message } });
   }
 });
