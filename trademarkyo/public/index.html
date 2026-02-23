@@ -518,201 +518,211 @@
 </div>
 
 <script>
-<script>
-  // Always use same-origin API (works on Railway + custom domain + localhost)
-  const API_BASE = '';
+// Always use same-origin API (works on Railway domain + custom domain + localhost)
+const API_BASE = '';
 
-  async function runScan() {
-    const mark = document.getElementById('markInput').value.trim().toUpperCase();
-    const classCode = document.getElementById('classSelect').value;
-    const container = document.getElementById('resultsContainer');
-    const btn = document.getElementById('scanBtn');
+async function runScan() {
+  const mark = document.getElementById('markInput').value.trim().toUpperCase();
+  const classCode = document.getElementById('classSelect').value;
+  const container = document.getElementById('resultsContainer');
+  const btn = document.getElementById('scanBtn');
 
-    if (!mark) { document.getElementById('markInput').focus(); return; }
-
-    btn.disabled = true;
-    container.innerHTML = `
-      <div class="loading-state">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">Scanning USPTO Database</div>
-        <div class="loading-step" id="loadingStep">Connecting to live USPTO...</div>
-      </div>`;
-
-    const updateStep = (msg) => {
-      const el = document.getElementById('loadingStep');
-      if (el) el.textContent = msg;
-    };
-
-    try {
-      updateStep('Querying TESS (scrape) with fallback...');
-      const searchRes = await fetch(`${API_BASE}/api/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ markName: mark, classCode })
-      });
-
-      if (!searchRes.ok) {
-        const txt = await searchRes.text().catch(() => '');
-        throw new Error(`Search failed (${searchRes.status}) ${txt ? '- ' + txt : ''}`);
-      }
-
-      const searchData = await searchRes.json();
-
-      // Normalize to what your renderer expects
-      const usptoData = {
-        liveSearch: searchData.mode !== 'ai_only',
-        mode: searchData.mode,
-        totalFound: Array.isArray(searchData.results) ? searchData.results.length : 0,
-        results: Array.isArray(searchData.results) ? searchData.results : [],
-        meta: searchData.meta || {}
-      };
-
-      updateStep(`Found ${usptoData.totalFound} marks — running AI DuPont analysis...`);
-
-      const analysisRes = await fetch(`${API_BASE}/api/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          markName: mark,
-          results: usptoData.results
-        })
-      });
-
-      if (!analysisRes.ok) {
-        const txt = await analysisRes.text().catch(() => '');
-        throw new Error(`Analysis failed (${analysisRes.status}) ${txt ? '- ' + txt : ''}`);
-      }
-
-      const analysis = await analysisRes.json();
-
-      updateStep('Building report...');
-      renderResults(mark, classCode, usptoData, analysis);
-
-    } catch (err) {
-      container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
-    }
-
-    btn.disabled = false;
+  if (!mark) {
+    document.getElementById('markInput').focus();
+    return;
   }
 
-  function renderResults(mark, classCode, usptoData, analysis) {
-    const container = document.getElementById('resultsContainer');
-    const score = analysis.approvalScore || 0;
-    const scoreClass = score >= 70 ? 'score-green' : score >= 40 ? 'score-yellow' : 'score-red';
-    const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
+  btn.disabled = true;
 
-    const conflicts = analysis.conflictAnalysis || [];
+  container.innerHTML = `
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Scanning USPTO Database</div>
+      <div class="loading-step" id="loadingStep">Connecting to live USPTO...</div>
+    </div>`;
 
-    // Your Claude JSON schema uses: serialNumber, markName, status, riskLevel, goodsServicesOverlap, similarity
-    // Your UI expects: serialNumber, mark, goods, isLive, reason
-    const normalizedConflicts = conflicts.map(c => {
-      const status = (c.status || '').toUpperCase();
-      const isLive = status.includes('LIVE') || status === 'LIVE';
+  const updateStep = (msg) => {
+    const el = document.getElementById('loadingStep');
+    if (el) el.textContent = msg;
+  };
 
-      return {
-        serialNumber: c.serialNumber || null,
-        mark: c.markName || null,
-        goods: c.goodsServicesOverlap || '',
-        isLive,
-        riskLevel: (c.riskLevel || 'medium').toUpperCase(),
-        reason: c.similarity || ''
-      };
+  try {
+    updateStep('Querying TESS (scrape) with fallback...');
+
+    // ✅ NEW BACKEND CONTRACT:
+    // POST /api/search  body: { markName }
+    const searchRes = await fetch(`${API_BASE}/api/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markName: mark, classCode })
     });
 
-    const liveConflicts = normalizedConflicts.filter(c => c.isLive).length;
-    const deadConflicts = normalizedConflicts.filter(c => !c.isLive).length;
+    if (!searchRes.ok) {
+      const txt = await searchRes.text().catch(() => '');
+      throw new Error(`Search failed (${searchRes.status})${txt ? ': ' + txt : ''}`);
+    }
 
-    const conflictsHTML = normalizedConflicts.length > 0
-      ? normalizedConflicts.map(c => {
-          const risk = c.riskLevel || 'MEDIUM';
-          const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
-          return `
-            <div class="conflict-item">
-              <div>
-                <div class="conflict-mark">${c.mark || 'N/A'}</div>
-                <div class="conflict-goods">${c.goods ? c.goods.substring(0,120) + (c.goods.length > 120 ? '...' : '') : 'No goods description'}</div>
-              </div>
-              <div>
-                <div class="conflict-serial">${c.serialNumber || ''}</div>
-                <div style="margin-top:0.3rem">
-                  <span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span>
-                </div>
-              </div>
-              <div style="text-align:right">
-                <span class="risk-tag ${riskClass}">${risk} RISK</span>
-                ${c.reason ? `<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>` : ''}
-              </div>
-            </div>`;
-        }).join('')
-      : '<div class="no-conflicts">✓ NO CONFLICTING MARKS IDENTIFIED</div>';
+    const searchData = await searchRes.json();
 
-    const risksHTML = (analysis.mainRisks || []).map(r =>
-      `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted);display:flex;gap:0.75rem"><span style="color:var(--accent);flex-shrink:0">▸</span>${r}</div>`
-    ).join('');
+    // Normalize searchData to your UI's expected shape
+    const usptoData = {
+      liveSearch: searchData.mode !== 'ai_only',
+      mode: searchData.mode,
+      totalFound: Array.isArray(searchData.results) ? searchData.results.length : 0,
+      results: Array.isArray(searchData.results) ? searchData.results : [],
+      meta: searchData.meta || {}
+    };
 
-    const sourceTag = usptoData.liveSearch
-      ? `<span class="source-tag source-live">● LIVE USPTO DATA</span>`
-      : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
+    updateStep(`Found ${usptoData.totalFound} marks — running AI DuPont analysis...`);
 
-    container.innerHTML = `
-      <div class="verdict-card">
-        <div class="verdict-header">
-          <div>
-            <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
-            <div class="verdict-mark">${mark}</div>
-            <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">
-              ${analysis.distinctiveness || ''}
-            </div>
-          </div>
-          <div class="score-display">
-            <span class="score-number ${scoreClass}">${score}</span>
-            <span class="score-label">Approval Likelihood</span>
-            <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict || ''}</div>
-          </div>
-        </div>
+    // ✅ NEW BACKEND CONTRACT:
+    // POST /api/analyze body: { markName, results }
+    const analysisRes = await fetch(`${API_BASE}/api/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        markName: mark,
+        results: usptoData.results
+      })
+    });
 
-        <div class="verdict-bar">
-          <div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div>
-        </div>
+    if (!analysisRes.ok) {
+      const txt = await analysisRes.text().catch(() => '');
+      throw new Error(`Analysis failed (${analysisRes.status})${txt ? ': ' + txt : ''}`);
+    }
 
-        <div class="stats-row">
-          <div class="stat-box">
-            <span class="stat-num">${usptoData.totalFound || 0}</span>
-            <span class="stat-lbl">Records Reviewed</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-num" style="color:var(--red)">${liveConflicts}</span>
-            <span class="stat-lbl">Live Conflicts</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-num" style="color:var(--muted)">${deadConflicts}</span>
-            <span class="stat-lbl">Dead Marks</span>
-          </div>
-          <div class="stat-box">
-            <span class="stat-num" style="color:${barColor}">${score}%</span>
-            <span class="stat-lbl">Approval Score</span>
-          </div>
-        </div>
+    const analysis = await analysisRes.json();
 
-        <div class="section-label">AI Recommendation</div>
-        <div class="verdict-analysis">${analysis.recommendation || 'No recommendation generated.'}</div>
+    updateStep('Building report...');
+    renderResults(mark, classCode, usptoData, analysis);
 
-        ${risksHTML ? `<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}` : ''}
-
-        <div class="section-label" style="margin-top:2rem">Conflict Analysis (${normalizedConflicts.length} marks reviewed)</div>
-        ${conflictsHTML}
-      </div>`;
-
-    setTimeout(() => {
-      const bar = document.getElementById('barFill');
-      if (bar) bar.style.width = score + '%';
-    }, 100);
+  } catch (err) {
+    container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
   }
 
-  document.getElementById('markInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') runScan();
+  btn.disabled = false;
+}
+
+function renderResults(mark, classCode, usptoData, analysis) {
+  const container = document.getElementById('resultsContainer');
+
+  const score = Number(analysis.approvalScore || 0);
+  const scoreClass = score >= 70 ? 'score-green' : score >= 40 ? 'score-yellow' : 'score-red';
+  const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
+
+  const conflicts = Array.isArray(analysis.conflictAnalysis) ? analysis.conflictAnalysis : [];
+
+  // Claude schema -> UI schema normalization
+  const normalizedConflicts = conflicts.map(c => {
+    const status = String(c.status || '').toUpperCase();
+    const isLive = status.includes('LIVE') || status === 'LIVE';
+
+    return {
+      serialNumber: c.serialNumber || null,
+      mark: c.markName || null,
+      goods: c.goodsServicesOverlap || '',
+      isLive,
+      riskLevel: String(c.riskLevel || 'medium').toUpperCase(),
+      reason: c.similarity || ''
+    };
   });
-</script>
-</script>
+
+  const liveConflicts = normalizedConflicts.filter(c => c.isLive).length;
+  const deadConflicts = normalizedConflicts.filter(c => !c.isLive).length;
+
+  const conflictsHTML = normalizedConflicts.length > 0
+    ? normalizedConflicts.map(c => {
+        const risk = c.riskLevel || 'MEDIUM';
+        const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
+
+        return `
+          <div class="conflict-item">
+            <div>
+              <div class="conflict-mark">${c.mark || 'N/A'}</div>
+              <div class="conflict-goods">${c.goods ? c.goods.substring(0,120) + (c.goods.length > 120 ? '...' : '') : 'No goods description'}</div>
+            </div>
+            <div>
+              <div class="conflict-serial">${c.serialNumber || ''}</div>
+              <div style="margin-top:0.3rem">
+                <span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span>
+              </div>
+            </div>
+            <div style="text-align:right">
+              <span class="risk-tag ${riskClass}">${risk} RISK</span>
+              ${c.reason ? `<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('')
+    : '<div class="no-conflicts">✓ NO CONFLICTING MARKS IDENTIFIED</div>';
+
+  const risksHTML = (analysis.mainRisks || []).map(r =>
+    `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted);display:flex;gap:0.75rem"><span style="color:var(--accent);flex-shrink:0">▸</span>${r}</div>`
+  ).join('');
+
+  const sourceTag = usptoData.liveSearch
+    ? `<span class="source-tag source-live">● LIVE SEARCH</span>`
+    : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
+
+  container.innerHTML = `
+    <div class="verdict-card">
+      <div class="verdict-header">
+        <div>
+          <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
+          <div class="verdict-mark">${mark}</div>
+          <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">
+            ${analysis.distinctiveness || ''}
+          </div>
+        </div>
+        <div class="score-display">
+          <span class="score-number ${scoreClass}">${score}</span>
+          <span class="score-label">Approval Likelihood</span>
+          <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict || ''}</div>
+        </div>
+      </div>
+
+      <div class="verdict-bar">
+        <div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-box">
+          <span class="stat-num">${usptoData.totalFound || 0}</span>
+          <span class="stat-lbl">Records Reviewed</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" style="color:var(--red)">${liveConflicts}</span>
+          <span class="stat-lbl">Live Conflicts</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" style="color:var(--muted)">${deadConflicts}</span>
+          <span class="stat-lbl">Dead Marks</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num" style="color:${barColor}">${score}%</span>
+          <span class="stat-lbl">Approval Score</span>
+        </div>
+      </div>
+
+      <div class="section-label">AI Recommendation</div>
+      <div class="verdict-analysis">${analysis.recommendation || 'No recommendation generated.'}</div>
+
+      ${risksHTML ? `<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}` : ''}
+
+      <div class="section-label" style="margin-top:2rem">Conflict Analysis (${normalizedConflicts.length} marks reviewed)</div>
+      ${conflictsHTML}
+    </div>`;
+
+  setTimeout(() => {
+    const bar = document.getElementById('barFill');
+    if (bar) bar.style.width = score + '%';
+  }, 100);
+}
+
+// Enter key triggers scan
+document.getElementById('markInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') runScan();
+});
+  
+</script>  
 </body>
 </html>
