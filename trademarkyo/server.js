@@ -1,8 +1,10 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
+const puppeteer = require('puppeteer-core');
 
 const app = express();
 app.use(cors());
@@ -11,216 +13,227 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = Number(process.env.PORT || 8080);
 
-function truncate(s, n) {
-  const str = String(s || '');
-  return str.length > n ? str.slice(0, n - 1) + '…' : str;
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function truncate(s, n) { const str = String(s || ''); return str.length > n ? str.slice(0, n - 1) + '…' : str; }
+function safeJsonParse(text) { try { return JSON.parse(text); } catch { return null; } }
+
+function findChrome() {
+  const env = process.env.CHROME_PATH;
+  if (env && fs.existsSync(env)) return env;
+  for (const p of ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']) {
+    if (fs.existsSync(p)) return p;
+  }
+  throw new Error('Chrome not found. Checked: /usr/bin/chromium, /usr/bin/chromium-browser, /usr/bin/google-chrome');
 }
 
-function safeJsonParse(text) {
-  try { return JSON.parse(text); } catch { return null; }
-}
-
-// ─── USPTO Search via their open search API ──────────────────────────────────
-// Uses the USPTO Open Data Portal search endpoint - no browser needed
-async function searchUsptoCdsApi(markName) {
-  const encoded = encodeURIComponent(markName);
-  
-  // Try the USPTO TSDR/CDS search endpoint
-  const url = `https://tsdrapi.uspto.gov/ts/cd/casestatus/sn/${encoded}/info.json`;
-  
-  // Actually use the trademark search API
-  const searchUrl = `https://developer.uspto.gov/ds-api/opi/v1/applications/trademarks?searchText=markLiteral%3A%22${encoded}%22&start=0&rows=15&sort=appFilingDate+desc`;
-  
-  const resp = await fetch(searchUrl, {
-    headers: { 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(15000)
+async function launchBrowser() {
+  const executablePath = findChrome();
+  console.log('[browser] Using chrome at:', executablePath);
+  return puppeteer.launch({
+    executablePath,
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process'],
   });
-
-  if (!resp.ok) throw new Error(`USPTO API ${resp.status}`);
-  
-  const data = await resp.json();
-  const docs = data?.response?.docs || data?.results || [];
-  
-  if (!docs.length) throw new Error('No results from USPTO API');
-
-  return docs.slice(0, 15).map(d => ({
-    source: 'uspto_api',
-    serialNumber: d.appSerialNumber || d.serialNumber || null,
-    liveDeadStatus: d.appStatus ? (d.appStatus.toLowerCase().includes('dead') ? 'DEAD' : 'LIVE') : null,
-    markName: d.markLiteral || d.markDescription || null,
-    owner: d.applicantName || d.ownerName || null,
-    goodsServices: d.goodsAndServices || d.goodsServicesDesc || null,
-    filingDate: d.appFilingDate || null,
-    registrationDate: d.regDate || null,
-    detailUrl: null
-  }));
 }
 
-// ─── Fallback: USPTO trademark search via public search endpoint ──────────────
-async function searchUsptoPublic(markName) {
-  const query = encodeURIComponent(`"${markName}"`);
-  const url = `https://developer.uspto.gov/ds-api/opi/v1/applications/trademarks?searchText=markLiteral%3A${query}&start=0&rows=15`;
+async function scrapeTess(markName) {
+  const browser = await launchBrowser();
+  const results = [];
 
-  const resp = await fetch(url, {
-    headers: { 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(15000)
-  });
+  try {
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(45000);
+    page.setDefaultTimeout(45000);
+    await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
 
-  if (!resp.ok) throw new Error(`USPTO public API ${resp.status}`);
+    console.log('[tess] Loading TESS search page...');
+    await page.goto('https://tess2.uspto.gov/bin/gate.exe?f=searchss&state=4802:n19s2n.1.1', {
+      waitUntil: 'domcontentloaded', timeout: 30000
+    });
 
-  const data = await resp.json();
-  const docs = data?.response?.docs || [];
-  if (!docs.length) throw new Error('No results');
+    const query = `*${markName.toUpperCase().trim()}*[COMB]`;
+    console.log('[tess] Submitting query:', query);
 
-  return docs.slice(0, 15).map(d => ({
-    source: 'uspto_public',
-    serialNumber: d.appSerialNumber || null,
-    liveDeadStatus: d.appStatus?.toLowerCase().includes('dead') ? 'DEAD' : 'LIVE',
-    markName: d.markLiteral || null,
-    owner: d.applicantName || null,
-    goodsServices: d.goodsAndServices || null,
-    filingDate: d.appFilingDate || null,
-    registrationDate: d.regDate || null,
-    detailUrl: null
-  }));
+    await page.waitForSelector('input[name="p_s_All"]', { timeout: 15000 });
+    await page.click('input[name="p_s_All"]');
+    await page.keyboard.down('Control');
+    await page.keyboard.press('a');
+    await page.keyboard.up('Control');
+    await page.type('input[name="p_s_All"]', query, { delay: 30 });
+
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
+      page.keyboard.press('Enter')
+    ]);
+
+    await sleep(1500);
+
+    const pageHtml = await page.content();
+    const pageText = await page.evaluate(() => document.body ? document.body.innerText : '');
+    console.log('[tess] Results page length:', pageHtml.length, '| Text sample:', pageText.substring(0, 200));
+
+    if (pageText.includes('No TESS records') || pageText.includes('0 records')) {
+      console.log('[tess] Zero records returned by TESS');
+      return [];
+    }
+
+    // Extract result rows - TESS shows a table with serial number, reg number, live/dead, mark
+    const rawRows = await page.evaluate(() => {
+      const rows = [];
+
+      // Primary: table rows with 8-digit serial numbers
+      document.querySelectorAll('tr').forEach(tr => {
+        const text = tr.innerText || '';
+        const serialMatch = text.match(/\b(\d{8})\b/);
+        if (!serialMatch) return;
+
+        const link = tr.querySelector('a[href]');
+        rows.push({
+          serial: serialMatch[1],
+          text: text.replace(/\s+/g, ' ').trim(),
+          href: link ? link.getAttribute('href') : null,
+          cells: Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
+        });
+      });
+
+      // Fallback: any links with serial numbers in href or text
+      if (rows.length === 0) {
+        document.querySelectorAll('a[href]').forEach(a => {
+          const href = a.getAttribute('href') || '';
+          const text = a.innerText.trim();
+          const combined = href + ' ' + text;
+          const m = combined.match(/\b(\d{8})\b/);
+          if (m && (href.includes('f=doc') || href.includes('serial'))) {
+            rows.push({ serial: m[1], text, href, cells: [text] });
+          }
+        });
+      }
+
+      return rows;
+    });
+
+    console.log(`[tess] Extracted ${rawRows.length} result rows`);
+
+    if (rawRows.length === 0) {
+      throw new Error(`TESS returned no parseable rows. Page text: ${pageText.substring(0, 300)}`);
+    }
+
+    // Fetch detail pages for top 10
+    const baseUrl = page.url();
+    for (const row of rawRows.slice(0, 10)) {
+      try {
+        let detailUrl = row.href
+          ? new URL(row.href, baseUrl).toString()
+          : `https://tess2.uspto.gov/bin/showfield?f=doc&state=4802:n19s2n.2.1&p_serial=${row.serial}`;
+
+        const dp = await browser.newPage();
+        dp.setDefaultTimeout(20000);
+        await dp.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await sleep(300);
+
+        const d = await dp.evaluate(() => {
+          const body = document.body ? document.body.innerText : '';
+          const get = (re) => { const m = body.match(re); return m ? m[1].trim() : null; };
+          return {
+            wordMark: get(/Word Mark[:\s]+([^\n]+)/i),
+            liveDead: get(/\b(LIVE|DEAD)\b/i),
+            owner: get(/Owner[:\s]+([^\n]+)/i),
+            goods: get(/Goods and Services[:\s]+([^\n]{10,})/i),
+            filingDate: get(/Filing Date[:\s]+([^\n]+)/i),
+            regDate: get(/Registration Date[:\s]+([^\n]+)/i),
+            serialNo: get(/Serial Number[:\s]+(\d{8})/i),
+          };
+        });
+
+        results.push({
+          source: 'tess_scrape',
+          serialNumber: d.serialNo || row.serial,
+          liveDeadStatus: d.liveDead ? d.liveDead.toUpperCase() : (row.text.includes('DEAD') ? 'DEAD' : 'LIVE'),
+          markName: d.wordMark || row.cells.find(c => c && c.length > 1 && !/^\d+$/.test(c)) || null,
+          owner: d.owner,
+          goodsServices: d.goods,
+          filingDate: d.filingDate,
+          registrationDate: d.regDate,
+          detailUrl,
+        });
+
+        await dp.close();
+        await sleep(150);
+      } catch (e) {
+        console.error('[tess] Detail error for', row.serial, ':', e.message);
+        results.push({
+          source: 'tess_basic',
+          serialNumber: row.serial,
+          liveDeadStatus: row.text.toUpperCase().includes('DEAD') ? 'DEAD' : 'LIVE',
+          markName: row.cells.find(c => c && !/^\d+$/.test(c) && c.length > 1) || null,
+          owner: null, goodsServices: null, filingDate: null, registrationDate: null, detailUrl: null,
+        });
+      }
+    }
+
+    await page.close();
+    console.log(`[tess] Done. Returning ${results.length} results`);
+    return results;
+
+  } finally {
+    await browser.close();
+  }
 }
 
-// ─── Fallback: wildcard search ────────────────────────────────────────────────
-async function searchUsptoWildcard(markName) {
-  const upper = markName.toUpperCase().trim();
-  // Search for marks containing similar words
-  const query = encodeURIComponent(`markLiteral:${upper}*`);
-  const url = `https://developer.uspto.gov/ds-api/opi/v1/applications/trademarks?searchText=${query}&start=0&rows=15`;
-
-  const resp = await fetch(url, {
-    headers: { 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(15000)
-  });
-
-  if (!resp.ok) throw new Error(`Wildcard search ${resp.status}`);
-
-  const data = await resp.json();
-  const docs = data?.response?.docs || [];
-  if (!docs.length) throw new Error('No wildcard results');
-
-  return docs.slice(0, 15).map(d => ({
-    source: 'uspto_wildcard',
-    serialNumber: d.appSerialNumber || null,
-    liveDeadStatus: d.appStatus?.toLowerCase().includes('dead') ? 'DEAD' : 'LIVE',
-    markName: d.markLiteral || null,
-    owner: d.applicantName || null,
-    goodsServices: d.goodsAndServices || null,
-    filingDate: d.appFilingDate || null,
-    detailUrl: null
-  }));
-}
-
-// ─── Claude DuPont Analysis ───────────────────────────────────────────────────
-async function callClaudeDupontAnalysis({ markName, results }) {
+async function callClaude({ markName, results }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set.');
-
-  const payload = {
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 1000,
-    temperature: 0.2,
-    system: 'You are a trademark clearance assistant. Perform a DuPont factor likelihood-of-confusion analysis. Return ONLY valid JSON. No markdown, no explanation.',
-    messages: [{
-      role: 'user',
-      content:
-        `Analyze trademark risk for proposed mark: "${markName}".\n\n` +
-        `Prior marks found in USPTO database:\n` +
-        JSON.stringify(results || [], null, 2) +
-        `\n\nReturn this exact JSON shape:\n` +
-        `{\n` +
-        `  "approvalScore": number (0-100),\n` +
-        `  "verdict": "approve" | "caution" | "reject",\n` +
-        `  "distinctiveness": string,\n` +
-        `  "mainRisks": string[],\n` +
-        `  "recommendation": string,\n` +
-        `  "conflictAnalysis": [\n` +
-        `    {\n` +
-        `      "serialNumber": string|null,\n` +
-        `      "markName": string|null,\n` +
-        `      "status": string|null,\n` +
-        `      "similarity": string,\n` +
-        `      "goodsServicesOverlap": string,\n` +
-        `      "riskLevel": "low" | "medium" | "high"\n` +
-        `    }\n` +
-        `  ]\n` +
-        `}`
-    }]
-  };
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify(payload),
+    headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      temperature: 0.2,
+      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. Return ONLY valid JSON, no markdown.',
+      messages: [{
+        role: 'user',
+        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nReturn JSON: {"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
+      }]
+    })
   });
 
   const text = await resp.text();
-  if (!resp.ok) throw new Error(`Claude API error (${resp.status}): ${truncate(text, 250)}`);
-
+  if (!resp.ok) throw new Error(`Claude API (${resp.status}): ${truncate(text, 250)}`);
   const parsed = safeJsonParse(text);
-  const contentText = parsed?.content?.[0]?.text;
-  if (!contentText) throw new Error('Claude response missing content');
-
-  const analysisJson = safeJsonParse(contentText);
-  if (!analysisJson) throw new Error('Claude did not return valid JSON');
-
-  return analysisJson;
+  const content = parsed?.content?.[0]?.text;
+  if (!content) throw new Error('Claude response missing content');
+  const result = safeJsonParse(content);
+  if (!result) throw new Error('Claude returned invalid JSON');
+  return result;
 }
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
 app.post('/api/search', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
-  if (!markName) return res.status(400).json({ error: 'markName is required' });
+  if (!markName) return res.status(400).json({ error: 'markName required' });
 
-  const meta = { markName, attempted: [], errors: [] };
-
-  // Try exact match first
-  for (const [name, fn] of [
-    ['uspto_exact', () => searchUsptoCdsApi(markName)],
-    ['uspto_public', () => searchUsptoPublic(markName)],
-    ['uspto_wildcard', () => searchUsptoWildcard(markName)],
-  ]) {
-    try {
-      meta.attempted.push(name);
-      const results = await fn();
-      console.log(`[search] ${name} returned ${results.length} results for "${markName}"`);
-      return res.json({ mode: name, results, meta });
-    } catch (e) {
-      console.error(`[search] ${name} failed:`, e.message);
-      meta.errors.push({ step: name, message: String(e?.message || e) });
-    }
+  try {
+    const results = await scrapeTess(markName);
+    return res.json({ mode: 'tess_scrape', results, meta: { markName } });
+  } catch (e) {
+    console.error('[search] Failed:', e.message);
+    return res.json({ mode: 'ai_only', results: [], meta: { markName, error: e.message } });
   }
-
-  // AI only fallback
-  console.log(`[search] all methods failed for "${markName}", returning ai_only`);
-  return res.json({ mode: 'ai_only', results: [], meta });
 });
 
 app.post('/api/analyze', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
   const results = Array.isArray(req.body?.results) ? req.body.results : [];
-  if (!markName) return res.status(400).json({ error: 'markName is required' });
+  if (!markName) return res.status(400).json({ error: 'markName required' });
 
   try {
-    const analysis = await callClaudeDupontAnalysis({ markName, results });
-    return res.json(analysis);
+    return res.json(await callClaude({ markName, results }));
   } catch (e) {
-    return res.status(500).json({ error: 'Claude analysis failed', message: String(e?.message || e) });
+    return res.status(500).json({ error: 'Claude failed', message: String(e?.message || e) });
   }
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
-
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
+app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
