@@ -41,183 +41,144 @@ async function launchBrowser() {
   });
 }
 
-async function scrapeTess(markName) {
+async function scrapeUsptoSearch(markName) {
   const browser = await launchBrowser();
   const results = [];
 
   try {
     const page = await browser.newPage();
-    page.setDefaultNavigationTimeout(45000);
-    page.setDefaultTimeout(45000);
+    page.setDefaultNavigationTimeout(60000);
+    page.setDefaultTimeout(60000);
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
 
-    // Step 1: Go to TESS and log what we find
-    console.log('[tess] Navigating to TESS search page...');
-    await page.goto('https://tess2.uspto.gov/bin/gate.exe?f=searchss&state=4802:n19s2n.1.1', {
-      waitUntil: 'domcontentloaded', timeout: 30000
-    });
-    await sleep(1000);
+    // USPTO's new trademark search
+    const searchUrl = `https://www.uspto.gov/trademarks/search`;
+    console.log('[scrape] Navigating to USPTO trademark search...');
+    await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+    await sleep(2000);
 
-    // Log the page title and all input names to see what's actually there
-    const pageInfo = await page.evaluate(() => {
-      const inputs = Array.from(document.querySelectorAll('input')).map(i => ({
-        name: i.name, type: i.type, id: i.id, placeholder: i.placeholder
-      }));
-      const forms = Array.from(document.querySelectorAll('form')).map(f => f.action);
-      return {
-        title: document.title,
-        url: window.location.href,
-        inputs,
-        forms,
-        bodySnippet: document.body ? document.body.innerText.substring(0, 300) : ''
-      };
-    });
-    console.log('[tess] Page info:', JSON.stringify(pageInfo));
+    console.log('[scrape] Page title:', await page.title());
+    console.log('[scrape] URL:', page.url());
 
-    // Find the search input - try multiple approaches
-    const searchInput = await page.evaluate(() => {
-      // Try known names
-      const candidates = [
-        document.querySelector('input[name="p_s_All"]'),
-        document.querySelector('input[name="p_s_ABAR"]'),
-        document.querySelector('input[type="text"]'),
-        document.querySelector('textarea'),
-      ];
-      for (const el of candidates) {
-        if (el) return { name: el.name, id: el.id, type: el.type, selector: el.name ? `input[name="${el.name}"]` : (el.id ? `#${el.id}` : 'input[type="text"]') };
-      }
-      return null;
+    // Find search input
+    const inputInfo = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll('input[type="text"], input[type="search"], input:not([type="hidden"])'));
+      return inputs.map(i => ({ name: i.name, id: i.id, placeholder: i.placeholder, type: i.type }));
     });
+    console.log('[scrape] Inputs:', JSON.stringify(inputInfo));
 
-    if (!searchInput) {
+    // Type in the search box - try multiple selectors
+    const searchSelectors = [
+      'input[placeholder*="Search"]',
+      'input[placeholder*="trademark"]',
+      'input[placeholder*="mark"]',
+      'input[type="search"]',
+      'input[id*="search"]',
+      'input[name*="search"]',
+      'input[type="text"]:not([type="hidden"])',
+    ];
+
+    let typed = false;
+    for (const sel of searchSelectors) {
+      try {
+        await page.waitForSelector(sel, { timeout: 3000 });
+        await page.click(sel);
+        await page.keyboard.down('Control');
+        await page.keyboard.press('a');
+        await page.keyboard.up('Control');
+        await page.type(sel, markName.toUpperCase(), { delay: 50 });
+        console.log('[scrape] Typed into:', sel);
+        typed = true;
+        break;
+      } catch {}
+    }
+
+    if (!typed) {
       const html = await page.content();
-      console.log('[tess] No input found. HTML snippet:', html.substring(0, 600));
-      throw new Error('Could not find search input on TESS page');
+      console.log('[scrape] Could not find input. HTML snippet:', html.substring(0, 600));
+      throw new Error('Could not find search input on USPTO search page');
     }
 
-    console.log('[tess] Found search input:', JSON.stringify(searchInput));
+    await sleep(500);
+    await page.keyboard.press('Enter');
+    console.log('[scrape] Submitted search');
 
-    const query = `*${markName.toUpperCase().trim()}*[COMB]`;
-    console.log('[tess] Query:', query);
-
-    await page.click(searchInput.selector);
-    await page.keyboard.down('Control');
-    await page.keyboard.press('a');
-    await page.keyboard.up('Control');
-    await page.type(searchInput.selector, query, { delay: 30 });
-
-    // Submit - try button first, then Enter
-    const submitted = await page.evaluate(() => {
-      const btn = document.querySelector('input[type="submit"], button[type="submit"], input[value="Submit Query"]');
-      if (btn) { btn.click(); return true; }
-      return false;
-    });
-    console.log('[tess] Submitted via button:', submitted);
-
-    if (!submitted) {
-      await page.keyboard.press('Enter');
-    }
-
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-    await sleep(1500);
+    // Wait for results to load
+    await sleep(5000);
+    console.log('[scrape] Post-search URL:', page.url());
 
     const pageText = await page.evaluate(() => document.body ? document.body.innerText : '');
-    console.log('[tess] Results page text (first 500):', pageText.substring(0, 500));
+    console.log('[scrape] Results page text (first 600):', pageText.substring(0, 600));
 
-    if (pageText.includes('No TESS records') || pageText.includes('0 records')) {
-      console.log('[tess] TESS returned 0 records');
-      return [];
-    }
+    // Extract results - the new USPTO search renders results as cards/rows
+    const rawResults = await page.evaluate(() => {
+      const results = [];
 
-    // Extract rows with serial numbers
-    const rawRows = await page.evaluate(() => {
-      const rows = [];
-      document.querySelectorAll('tr').forEach(tr => {
-        const text = tr.innerText || '';
-        const m = text.match(/\b(\d{8})\b/);
-        if (!m) return;
-        const link = tr.querySelector('a[href]');
-        rows.push({
-          serial: m[1],
-          text: text.replace(/\s+/g, ' ').trim(),
-          href: link ? link.getAttribute('href') : null,
-          cells: Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
-        });
-      });
+      // Try to find result items - USPTO new UI uses various structures
+      const selectors = [
+        '[data-testid*="result"]',
+        '[class*="result"]',
+        '[class*="trademark"]',
+        'table tr',
+        '[role="row"]',
+        'li[class*="item"]',
+      ];
 
-      if (rows.length === 0) {
-        document.querySelectorAll('a[href]').forEach(a => {
-          const href = a.getAttribute('href') || '';
-          const text = a.innerText.trim();
-          const m = (href + ' ' + text).match(/\b(\d{8})\b/);
-          if (m) rows.push({ serial: m[1], text, href, cells: [text] });
+      for (const sel of selectors) {
+        const items = document.querySelectorAll(sel);
+        if (items.length > 1) {
+          items.forEach(item => {
+            const text = item.innerText || item.textContent || '';
+            if (!text.trim() || text.length < 5) return;
+            // Look for serial numbers (8 digits)
+            const serialMatch = text.match(/\b(\d{8})\b/);
+            results.push({
+              text: text.replace(/\s+/g, ' ').trim().substring(0, 300),
+              serial: serialMatch ? serialMatch[1] : null,
+              selector: sel
+            });
+          });
+          if (results.length > 0) break;
+        }
+      }
+
+      // Fallback: grab all text with serial-number patterns
+      if (results.length === 0) {
+        const allText = document.body ? document.body.innerText : '';
+        const lines = allText.split('\n').filter(l => l.match(/\b\d{8}\b/));
+        lines.forEach(line => {
+          const m = line.match(/\b(\d{8})\b/);
+          if (m) results.push({ text: line.trim(), serial: m[1], selector: 'text_parse' });
         });
       }
-      return rows;
+
+      return results.slice(0, 15);
     });
 
-    console.log(`[tess] Found ${rawRows.length} result rows`);
-
-    if (rawRows.length === 0) {
-      const html = await page.content();
-      console.log('[tess] No rows found. HTML snippet:', html.substring(0, 800));
-      throw new Error('No result rows found in TESS results page');
+    console.log(`[scrape] Found ${rawResults.length} raw results`);
+    if (rawResults.length > 0) {
+      console.log('[scrape] Sample result:', JSON.stringify(rawResults[0]));
     }
 
-    const baseUrl = page.url();
-    for (const row of rawRows.slice(0, 10)) {
-      try {
-        const detailUrl = row.href
-          ? new URL(row.href, baseUrl).toString()
-          : `https://tess2.uspto.gov/bin/showfield?f=doc&state=4802:n19s2n.2.1&p_serial=${row.serial}`;
-
-        const dp = await browser.newPage();
-        dp.setDefaultTimeout(20000);
-        await dp.goto(detailUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
-        await sleep(300);
-
-        const d = await dp.evaluate(() => {
-          const body = document.body ? document.body.innerText : '';
-          const get = (re) => { const m = body.match(re); return m ? m[1].trim() : null; };
-          return {
-            wordMark: get(/Word Mark[:\s]+([^\n]+)/i),
-            liveDead: get(/\b(LIVE|DEAD)\b/i),
-            owner: get(/Owner[:\s]+([^\n]+)/i),
-            goods: get(/Goods and Services[:\s]+([^\n]{10,})/i),
-            filingDate: get(/Filing Date[:\s]+([^\n]+)/i),
-            regDate: get(/Registration Date[:\s]+([^\n]+)/i),
-            serialNo: get(/Serial Number[:\s]+(\d{8})/i),
-          };
-        });
-
-        results.push({
-          source: 'tess_scrape',
-          serialNumber: d.serialNo || row.serial,
-          liveDeadStatus: d.liveDead ? d.liveDead.toUpperCase() : (row.text.includes('DEAD') ? 'DEAD' : 'LIVE'),
-          markName: d.wordMark || row.cells.find(c => c && c.length > 1 && !/^\d+$/.test(c)) || null,
-          owner: d.owner,
-          goodsServices: d.goods,
-          filingDate: d.filingDate,
-          registrationDate: d.regDate,
-          detailUrl,
-        });
-
-        await dp.close();
-        await sleep(150);
-      } catch (e) {
-        console.error('[tess] Detail error for serial', row.serial, ':', e.message);
-        results.push({
-          source: 'tess_basic',
-          serialNumber: row.serial,
-          liveDeadStatus: row.text.toUpperCase().includes('DEAD') ? 'DEAD' : 'LIVE',
-          markName: row.cells.find(c => c && !/^\d+$/.test(c) && c.length > 1) || null,
-          owner: null, goodsServices: null, filingDate: null, registrationDate: null, detailUrl: null,
-        });
-      }
+    // Convert to structured format
+    for (const r of rawResults) {
+      const isLive = !r.text.toUpperCase().includes('DEAD') && !r.text.toUpperCase().includes('ABANDONED');
+      results.push({
+        source: 'uspto_scrape',
+        serialNumber: r.serial,
+        liveDeadStatus: isLive ? 'LIVE' : 'DEAD',
+        markName: null, // Will be filled by detail if possible
+        owner: null,
+        goodsServices: r.text,
+        filingDate: null,
+        registrationDate: null,
+        detailUrl: null,
+        rawText: r.text,
+      });
     }
 
     await page.close();
-    console.log(`[tess] Returning ${results.length} results`);
+    console.log(`[scrape] Returning ${results.length} results`);
     return results;
 
   } finally {
@@ -253,10 +214,7 @@ async function callClaude({ markName, results }) {
 
   const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
   const result = safeJsonParse(stripped);
-  if (!result) {
-    console.error('[claude] Failed to parse. Raw:', rawContent.substring(0, 500));
-    throw new Error('Claude returned invalid JSON');
-  }
+  if (!result) throw new Error('Claude returned invalid JSON');
   return result;
 }
 
@@ -264,10 +222,10 @@ app.post('/api/search', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
   if (!markName) return res.status(400).json({ error: 'markName required' });
   try {
-    const results = await scrapeTess(markName);
-    return res.json({ mode: 'tess_scrape', results, meta: { markName } });
+    const results = await scrapeUsptoSearch(markName);
+    return res.json({ mode: results.length > 0 ? 'uspto_scrape' : 'ai_only', results, meta: { markName } });
   } catch (e) {
-    console.error('[search] TESS failed:', e.message);
+    console.error('[search] Scrape failed:', e.message);
     return res.json({ mode: 'ai_only', results: [], meta: { markName, error: e.message } });
   }
 });
