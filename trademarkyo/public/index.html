@@ -518,10 +518,9 @@
 </div>
 
 <script>
-  // Auto-detect backend URL
-  const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:3000'
-    : window.location.origin;
+<script>
+  // Always use same-origin API (works on Railway + custom domain + localhost)
+  const API_BASE = '';
 
   async function runScan() {
     const mark = document.getElementById('markInput').value.trim().toUpperCase();
@@ -536,7 +535,7 @@
       <div class="loading-state">
         <div class="loading-spinner"></div>
         <div class="loading-text">Scanning USPTO Database</div>
-        <div class="loading-step" id="loadingStep">Connecting to live USPTO API...</div>
+        <div class="loading-step" id="loadingStep">Connecting to live USPTO...</div>
       </div>`;
 
     const updateStep = (msg) => {
@@ -545,19 +544,45 @@
     };
 
     try {
-      updateStep('Querying live USPTO records...');
-      const usptoRes = await fetch(`${API_BASE}/api/search?mark=${encodeURIComponent(mark)}&classCode=${classCode}`);
-      if (!usptoRes.ok) throw new Error('USPTO search failed');
-      const usptoData = await usptoRes.json();
+      updateStep('Querying TESS (scrape) with fallback...');
+      const searchRes = await fetch(`${API_BASE}/api/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markName: mark, classCode })
+      });
 
-      updateStep(`Found ${usptoData.totalFound || 0} records — running AI conflict analysis...`);
+      if (!searchRes.ok) {
+        const txt = await searchRes.text().catch(() => '');
+        throw new Error(`Search failed (${searchRes.status}) ${txt ? '- ' + txt : ''}`);
+      }
+
+      const searchData = await searchRes.json();
+
+      // Normalize to what your renderer expects
+      const usptoData = {
+        liveSearch: searchData.mode !== 'ai_only',
+        mode: searchData.mode,
+        totalFound: Array.isArray(searchData.results) ? searchData.results.length : 0,
+        results: Array.isArray(searchData.results) ? searchData.results : [],
+        meta: searchData.meta || {}
+      };
+
+      updateStep(`Found ${usptoData.totalFound} marks — running AI DuPont analysis...`);
+
       const analysisRes = await fetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mark, classCode, usptoData })
+        body: JSON.stringify({
+          markName: mark,
+          results: usptoData.results
+        })
       });
 
-      if (!analysisRes.ok) throw new Error('Analysis failed');
+      if (!analysisRes.ok) {
+        const txt = await analysisRes.text().catch(() => '');
+        throw new Error(`Analysis failed (${analysisRes.status}) ${txt ? '- ' + txt : ''}`);
+      }
+
       const analysis = await analysisRes.json();
 
       updateStep('Building report...');
@@ -577,11 +602,28 @@
     const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
 
     const conflicts = analysis.conflictAnalysis || [];
-    const liveConflicts = conflicts.filter(c => c.isLive).length;
-    const deadConflicts = conflicts.filter(c => !c.isLive).length;
 
-    const conflictsHTML = conflicts.length > 0
-      ? conflicts.map(c => {
+    // Your Claude JSON schema uses: serialNumber, markName, status, riskLevel, goodsServicesOverlap, similarity
+    // Your UI expects: serialNumber, mark, goods, isLive, reason
+    const normalizedConflicts = conflicts.map(c => {
+      const status = (c.status || '').toUpperCase();
+      const isLive = status.includes('LIVE') || status === 'LIVE';
+
+      return {
+        serialNumber: c.serialNumber || null,
+        mark: c.markName || null,
+        goods: c.goodsServicesOverlap || '',
+        isLive,
+        riskLevel: (c.riskLevel || 'medium').toUpperCase(),
+        reason: c.similarity || ''
+      };
+    });
+
+    const liveConflicts = normalizedConflicts.filter(c => c.isLive).length;
+    const deadConflicts = normalizedConflicts.filter(c => !c.isLive).length;
+
+    const conflictsHTML = normalizedConflicts.length > 0
+      ? normalizedConflicts.map(c => {
           const risk = c.riskLevel || 'MEDIUM';
           const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
           return `
@@ -610,7 +652,7 @@
 
     const sourceTag = usptoData.liveSearch
       ? `<span class="source-tag source-live">● LIVE USPTO DATA</span>`
-      : `<span class="source-tag source-ai">⚡ AI ANALYSIS</span>`;
+      : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
 
     container.innerHTML = `
       <div class="verdict-card">
@@ -619,7 +661,7 @@
             <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
             <div class="verdict-mark">${mark}</div>
             <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">
-              ${analysis.distinctiveness || ''} — ${analysis.distinctivenessExplain || ''}
+              ${analysis.distinctiveness || ''}
             </div>
           </div>
           <div class="score-display">
@@ -636,7 +678,7 @@
         <div class="stats-row">
           <div class="stat-box">
             <span class="stat-num">${usptoData.totalFound || 0}</span>
-            <span class="stat-lbl">USPTO Records</span>
+            <span class="stat-lbl">Records Reviewed</span>
           </div>
           <div class="stat-box">
             <span class="stat-num" style="color:var(--red)">${liveConflicts}</span>
@@ -657,7 +699,7 @@
 
         ${risksHTML ? `<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}` : ''}
 
-        <div class="section-label" style="margin-top:2rem">Conflict Analysis (${conflicts.length} marks reviewed)</div>
+        <div class="section-label" style="margin-top:2rem">Conflict Analysis (${normalizedConflicts.length} marks reviewed)</div>
         ${conflictsHTML}
       </div>`;
 
@@ -670,6 +712,7 @@
   document.getElementById('markInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') runScan();
   });
+</script>
 </script>
 </body>
 </html>
