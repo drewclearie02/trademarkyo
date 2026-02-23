@@ -18,7 +18,6 @@ function truncate(s, n) { const str = String(s || ''); return str.length > n ? s
 
 function safeJsonParse(text) {
   if (!text) return null;
-  // Strip markdown code fences if present
   const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
   try { return JSON.parse(cleaned); } catch { return null; }
 }
@@ -52,36 +51,85 @@ async function scrapeTess(markName) {
     page.setDefaultTimeout(45000);
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
 
-    console.log('[tess] Navigating to TESS...');
+    // Step 1: Go to TESS and log what we find
+    console.log('[tess] Navigating to TESS search page...');
     await page.goto('https://tess2.uspto.gov/bin/gate.exe?f=searchss&state=4802:n19s2n.1.1', {
       waitUntil: 'domcontentloaded', timeout: 30000
     });
+    await sleep(1000);
+
+    // Log the page title and all input names to see what's actually there
+    const pageInfo = await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll('input')).map(i => ({
+        name: i.name, type: i.type, id: i.id, placeholder: i.placeholder
+      }));
+      const forms = Array.from(document.querySelectorAll('form')).map(f => f.action);
+      return {
+        title: document.title,
+        url: window.location.href,
+        inputs,
+        forms,
+        bodySnippet: document.body ? document.body.innerText.substring(0, 300) : ''
+      };
+    });
+    console.log('[tess] Page info:', JSON.stringify(pageInfo));
+
+    // Find the search input - try multiple approaches
+    const searchInput = await page.evaluate(() => {
+      // Try known names
+      const candidates = [
+        document.querySelector('input[name="p_s_All"]'),
+        document.querySelector('input[name="p_s_ABAR"]'),
+        document.querySelector('input[type="text"]'),
+        document.querySelector('textarea'),
+      ];
+      for (const el of candidates) {
+        if (el) return { name: el.name, id: el.id, type: el.type, selector: el.name ? `input[name="${el.name}"]` : (el.id ? `#${el.id}` : 'input[type="text"]') };
+      }
+      return null;
+    });
+
+    if (!searchInput) {
+      const html = await page.content();
+      console.log('[tess] No input found. HTML snippet:', html.substring(0, 600));
+      throw new Error('Could not find search input on TESS page');
+    }
+
+    console.log('[tess] Found search input:', JSON.stringify(searchInput));
 
     const query = `*${markName.toUpperCase().trim()}*[COMB]`;
     console.log('[tess] Query:', query);
 
-    await page.waitForSelector('input[name="p_s_All"]', { timeout: 15000 });
-    await page.click('input[name="p_s_All"]');
+    await page.click(searchInput.selector);
     await page.keyboard.down('Control');
     await page.keyboard.press('a');
     await page.keyboard.up('Control');
-    await page.type('input[name="p_s_All"]', query, { delay: 30 });
+    await page.type(searchInput.selector, query, { delay: 30 });
 
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }),
-      page.keyboard.press('Enter')
-    ]);
+    // Submit - try button first, then Enter
+    const submitted = await page.evaluate(() => {
+      const btn = document.querySelector('input[type="submit"], button[type="submit"], input[value="Submit Query"]');
+      if (btn) { btn.click(); return true; }
+      return false;
+    });
+    console.log('[tess] Submitted via button:', submitted);
 
+    if (!submitted) {
+      await page.keyboard.press('Enter');
+    }
+
+    await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     await sleep(1500);
 
     const pageText = await page.evaluate(() => document.body ? document.body.innerText : '');
-    console.log('[tess] Page text (first 400 chars):', pageText.substring(0, 400));
+    console.log('[tess] Results page text (first 500):', pageText.substring(0, 500));
 
     if (pageText.includes('No TESS records') || pageText.includes('0 records')) {
       console.log('[tess] TESS returned 0 records');
       return [];
     }
 
+    // Extract rows with serial numbers
     const rawRows = await page.evaluate(() => {
       const rows = [];
       document.querySelectorAll('tr').forEach(tr => {
@@ -102,9 +150,7 @@ async function scrapeTess(markName) {
           const href = a.getAttribute('href') || '';
           const text = a.innerText.trim();
           const m = (href + ' ' + text).match(/\b(\d{8})\b/);
-          if (m && (href.includes('f=doc') || href.includes('serial'))) {
-            rows.push({ serial: m[1], text, href, cells: [text] });
-          }
+          if (m) rows.push({ serial: m[1], text, href, cells: [text] });
         });
       }
       return rows;
@@ -113,10 +159,9 @@ async function scrapeTess(markName) {
     console.log(`[tess] Found ${rawRows.length} result rows`);
 
     if (rawRows.length === 0) {
-      // Log full page HTML for debugging
       const html = await page.content();
-      console.log('[tess] Full page HTML (first 800):', html.substring(0, 800));
-      throw new Error('No result rows found in TESS page');
+      console.log('[tess] No rows found. HTML snippet:', html.substring(0, 800));
+      throw new Error('No result rows found in TESS results page');
     }
 
     const baseUrl = page.url();
@@ -191,10 +236,10 @@ async function callClaude({ markName, results }) {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 1200,
       temperature: 0.2,
-      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. You MUST return ONLY a raw JSON object. Do NOT use markdown code fences. Do NOT include any text before or after the JSON.',
+      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. Return ONLY a raw JSON object. No markdown fences. No explanation.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records (${results.length} found):\n${JSON.stringify(results, null, 2)}\n\nRespond with ONLY this JSON object (no markdown, no explanation):\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
+        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records (${results.length} found):\n${JSON.stringify(results, null, 2)}\n\nReturn ONLY this JSON (no markdown):\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
       }]
     })
   });
@@ -206,11 +251,10 @@ async function callClaude({ markName, results }) {
   const rawContent = parsed?.content?.[0]?.text || '';
   console.log('[claude] Raw response (first 200):', rawContent.substring(0, 200));
 
-  // Strip markdown fences and parse
   const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
   const result = safeJsonParse(stripped);
   if (!result) {
-    console.error('[claude] Failed to parse JSON. Raw:', rawContent.substring(0, 500));
+    console.error('[claude] Failed to parse. Raw:', rawContent.substring(0, 500));
     throw new Error('Claude returned invalid JSON');
   }
   return result;
@@ -219,7 +263,6 @@ async function callClaude({ markName, results }) {
 app.post('/api/search', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
   if (!markName) return res.status(400).json({ error: 'markName required' });
-
   try {
     const results = await scrapeTess(markName);
     return res.json({ mode: 'tess_scrape', results, meta: { markName } });
@@ -233,7 +276,6 @@ app.post('/api/analyze', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
   const results = Array.isArray(req.body?.results) ? req.body.results : [];
   if (!markName) return res.status(400).json({ error: 'markName required' });
-
   try {
     return res.json(await callClaude({ markName, results }));
   } catch (e) {
