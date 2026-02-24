@@ -466,6 +466,96 @@
     margin: 0 auto;
     letter-spacing: 0.05em;
   }
+
+/* =========================
+   Mobile responsiveness
+   Add at the END of <style>
+   ========================= */
+
+html, body { max-width: 100%; overflow-x: hidden; }
+
+input, select, button { max-width: 100%; }
+
+.conflict-mark,
+.verdict-mark,
+.verdict-analysis,
+.conflict-goods {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Tablet and down */
+@media (max-width: 900px) {
+  .header { padding: 1.25rem 1.25rem; gap: 1rem; }
+  .hero { padding: 3rem 1.25rem 2rem; }
+  .search-container { padding: 0 1.25rem 2rem; }
+  .results-container { padding: 0 1.25rem 3rem; }
+  .disclaimer { padding: 1.5rem 1.25rem; }
+
+  .search-box { padding: 1.25rem; }
+
+  .input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .class-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  input[type="text"] {
+    font-size: 1.15rem;
+    padding: 0.95rem 1rem;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-scan {
+    font-size: 1.25rem;
+    padding: 1rem;
+  }
+
+  .verdict-card { padding: 1.5rem; }
+  .verdict-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .score-display { text-align: left; }
+
+  .stats-row { flex-direction: column; }
+  .stat-box { text-align: left; }
+}
+
+/* Phone */
+@media (max-width: 520px) {
+  .header {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  /* Keep it clean on small screens */
+  .badge { display: none; }
+  .live-indicator { font-size: 0.6rem; }
+
+  h1 {
+    font-size: 3.1rem; /* overrides clamp for tiny screens */
+    line-height: 0.95;
+  }
+
+  .hero-sub { font-size: 0.95rem; }
+
+  .verdict-mark { font-size: 2.4rem; }
+  .score-number { font-size: 4rem; }
+
+  /* Conflict items collapse into stacked cards */
+  .conflict-item {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .conflict-serial { font-size: 0.75rem; }
+}
 </style>
 </head>
 <body>
