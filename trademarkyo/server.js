@@ -252,6 +252,57 @@ app.post('/api/analyze', async (req, res) => {
     return res.status(500).json({ error: 'Claude failed', message: String(e?.message || e) });
   }
 });
+// ADD THIS BLOCK to server.js just before the /health route
+
+app.post('/api/suggest', async (req, res) => {
+  const markName = String(req.body?.markName || '').trim();
+  const classCode = String(req.body?.classCode || '').trim();
+  const score = Number(req.body?.score || 0);
+  const risks = String(req.body?.risks || '');
+  const conflicts = String(req.body?.conflicts || '');
+  if (!markName) return res.status(400).json({ error: 'markName required' });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
+
+  const classContext = classCode ? `The mark will be used in International Class ${classCode}.` : '';
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        temperature: 0.9,
+        system: 'You are a creative trademark attorney and brand naming expert. Generate distinctive, trademarkable brand name alternatives. Return ONLY a raw JSON object. No markdown. No explanation.',
+        messages: [{
+          role: 'user',
+          content: `The proposed trademark "${markName}" scored ${score}% approval likelihood due to these conflicts: ${conflicts}. Risk factors: ${risks}. ${classContext}
+
+Generate 6 alternative brand names that:
+1. Evoke a similar brand concept or sound to "${markName}"
+2. Avoid the identified conflicts
+3. Are highly distinctive and fanciful (invented/coined words score best)
+4. Would be strong trademark candidates
+
+Return ONLY this JSON:
+{"suggestions":[{"name":"MARKNAME","reason":"Brief explanation of why this is stronger (1 sentence)"}]}`
+        }]
+      })
+    });
+
+    const text = await resp.text();
+    if (!resp.ok) throw new Error(`Claude API (${resp.status})`);
+    const parsed = JSON.parse(text);
+    const rawContent = parsed?.content?.[0]?.text || '';
+    const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+    const result = JSON.parse(stripped);
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: 'Suggestion failed', message: String(e?.message || e) });
+  }
+});
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
