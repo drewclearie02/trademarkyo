@@ -88,13 +88,9 @@
   .source-live { background: rgba(71,255,138,0.1); color: var(--green); }
   .source-ai { background: rgba(232,255,71,0.1); color: var(--accent); }
   .disclaimer { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); line-height: 1.6; padding: 2rem 3rem; border-top: 1px solid var(--border); max-width: 900px; margin: 0 auto; letter-spacing: 0.05em; }
-
-  /* PDF BUTTON */
   .btn-pdf { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.6rem 1.2rem; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 0.5rem; }
   .btn-pdf:hover { border-color: var(--accent); color: var(--accent); }
   .btn-pdf svg { width: 12px; height: 12px; }
-
-  /* DRILL-DOWN MODAL */
   #markModal { position: fixed; inset: 0; z-index: 8888; display: none; align-items: center; justify-content: center; padding: 2rem; }
   #markModal.open { display: flex; }
   .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
@@ -118,6 +114,24 @@
   .modal-divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
   .modal-analysis { background: var(--bg); border-left: 3px solid var(--accent); padding: 1rem 1.25rem; font-size: 0.85rem; line-height: 1.6; color: var(--text); font-weight: 300; }
   .click-hint { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); text-align: right; margin-bottom: 0.5rem; letter-spacing: 0.1em; }
+
+  /* NAME SUGGESTIONS */
+  .suggestions-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.5s ease forwards; position: relative; overflow: hidden; }
+  .suggestions-card::before { content: ''; position: absolute; top: -1px; left: 0; width: 4rem; height: 3px; background: var(--accent); }
+  .suggestions-card::after { content: 'AI'; position: absolute; top: 1.5rem; right: 2rem; font-family: 'Bebas Neue', cursive; font-size: 5rem; color: rgba(232,255,71,0.04); letter-spacing: 0.1em; pointer-events: none; }
+  .suggestions-intro { font-size: 0.9rem; color: var(--muted); line-height: 1.6; font-weight: 300; margin-bottom: 2rem; }
+  .suggestion-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+  .suggestion-item { background: var(--bg); border: 1px solid var(--border); padding: 1.25rem 1.5rem; cursor: pointer; transition: all 0.15s; position: relative; }
+  .suggestion-item:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .suggestion-item:hover .suggestion-name { color: var(--accent); }
+  .suggestion-name { font-family: 'Bebas Neue', cursive; font-size: 1.5rem; letter-spacing: 0.05em; margin-bottom: 0.4rem; transition: color 0.15s; }
+  .suggestion-why { font-size: 0.75rem; color: var(--muted); line-height: 1.4; font-weight: 300; }
+  .suggestion-score-badge { position: absolute; top: 0.75rem; right: 0.75rem; font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.1em; padding: 0.2rem 0.4rem; background: rgba(71,255,138,0.1); color: var(--green); text-transform: uppercase; }
+  .suggestions-loading { padding: 2rem; text-align: center; }
+  .suggestions-loading .loading-spinner { margin-bottom: 1rem; }
+  .btn-resuggest { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.6rem 1.2rem; cursor: pointer; transition: all 0.15s; margin-top: 0.5rem; }
+  .btn-resuggest:hover { border-color: var(--accent); color: var(--accent); }
+  .try-name-hint { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); margin-top: 1rem; letter-spacing: 0.08em; }
 
   /* PASSWORD GATE */
   #passGate { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
@@ -277,6 +291,7 @@
 </div>
 
 <div class="results-container" id="resultsContainer"></div>
+<div id="suggestionsContainer" style="max-width:900px;margin:0 auto;padding:0 3rem;"></div>
 
 <div class="disclaimer">
   ⚠ NOT LEGAL ADVICE — This tool queries live USPTO data and uses AI analysis to estimate approval likelihood. Results are estimates only and should not substitute for consultation with a licensed trademark attorney. Common law rights may exist outside the USPTO database.
@@ -317,44 +332,22 @@ function openModal(idx) {
   if (!c) return;
   const risk = (c.riskLevel || 'MEDIUM').toUpperCase();
   const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
-
   document.getElementById('modalMarkName').textContent = c.mark || 'Unknown Mark';
-
   document.getElementById('modalTags').innerHTML = `
     <span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span>
-    <span class="risk-tag ${riskClass}">${risk} RISK</span>
-  `;
-
+    <span class="risk-tag ${riskClass}">${risk} RISK</span>`;
   document.getElementById('modalGrid').innerHTML = `
-    <div class="modal-stat">
-      <div class="modal-stat-label">Serial Number</div>
-      <div class="modal-stat-value" style="font-family:'DM Mono',monospace;font-size:0.85rem">${c.serialNumber || 'N/A'}</div>
-    </div>
-    <div class="modal-stat">
-      <div class="modal-stat-label">Status</div>
-      <div class="modal-stat-value" style="color:${c.isLive ? 'var(--green)' : 'var(--muted)'}">${c.isLive ? 'Live / Active' : 'Dead / Inactive'}</div>
-    </div>
-  `;
-
+    <div class="modal-stat"><div class="modal-stat-label">Serial Number</div><div class="modal-stat-value" style="font-family:'DM Mono',monospace;font-size:0.85rem">${c.serialNumber || 'N/A'}</div></div>
+    <div class="modal-stat"><div class="modal-stat-label">Status</div><div class="modal-stat-value" style="color:${c.isLive ? 'var(--green)' : 'var(--muted)'}">${c.isLive ? 'Live / Active' : 'Dead / Inactive'}</div></div>`;
   document.getElementById('modalGoods').innerHTML = `
     <div class="modal-field-label">Goods & Services Overlap</div>
-    <div class="modal-field-value">${c.goods || 'No description available.'}</div>
-  `;
-
+    <div class="modal-field-value">${c.goods || 'No description available.'}</div>`;
   document.getElementById('modalAnalysis').innerHTML = `
     <strong>Similarity:</strong> ${c.reason || 'N/A'}<br><br>
-    <strong>Conflict Assessment:</strong> This mark presents a <strong>${risk.toLowerCase()} risk</strong> of confusion with your proposed mark. ${c.isLive ? 'This is an active registration and would be cited against your application.' : 'This mark is no longer active, which reduces but does not eliminate risk.'}
-  `;
-
-  const usptoUrl = c.serialNumber
-    ? `https://tsdr.uspto.gov/#caseNumber=${c.serialNumber}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch`
-    : null;
-
+    <strong>Conflict Assessment:</strong> This mark presents a <strong>${risk.toLowerCase()} risk</strong> of confusion with your proposed mark. ${c.isLive ? 'This is an active registration and would be cited against your application.' : 'This mark is no longer active, which reduces but does not eliminate risk.'}`;
+  const usptoUrl = c.serialNumber ? `https://tsdr.uspto.gov/#caseNumber=${c.serialNumber}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch` : null;
   document.getElementById('modalLinks').innerHTML = usptoUrl
-    ? `<div class="modal-field-label" style="margin-bottom:0.5rem">View on USPTO</div>
-       <div class="modal-field-value"><a href="${usptoUrl}" target="_blank" rel="noopener">Open TSDR Record →</a></div>`
-    : '';
-
+    ? `<div class="modal-field-label" style="margin-bottom:0.5rem">View on USPTO</div><div class="modal-field-value"><a href="${usptoUrl}" target="_blank" rel="noopener">Open TSDR Record →</a></div>` : '';
   document.getElementById('markModal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -364,58 +357,109 @@ function closeModal() {
   document.body.style.overflow = '';
 }
 
+// ─── NAME SUGGESTIONS ────────────────────────────────────────
+let _currentMark = '';
+let _currentClass = '';
+let _currentAnalysis = null;
+
+async function generateSuggestions(mark, classCode, analysis) {
+  const container = document.getElementById('suggestionsContainer');
+  const score = Number(analysis.approvalScore || 0);
+
+  // Only show if score < 70
+  if (score >= 70) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const risks = (analysis.mainRisks || []).join('; ');
+  const conflicts = (analysis.conflictAnalysis || []).map(c => c.markName).filter(Boolean).join(', ');
+
+  container.innerHTML = `
+    <div class="suggestions-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+        <div>
+          <div class="section-label" style="margin-bottom:0.25rem">Alternative Name Suggestions</div>
+          <div class="suggestions-intro" style="margin-bottom:0">Your score of <strong style="color:${score >= 40 ? 'var(--yellow)' : 'var(--red)'}">${score}%</strong> suggests trademark conflicts. Here are AI-generated alternatives with stronger approval potential.</div>
+        </div>
+        <button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button>
+      </div>
+      <div class="suggestions-loading"><div class="loading-spinner"></div><div class="loading-text" style="font-size:0.7rem">Generating alternatives...</div></div>
+    </div>`;
+
+  try {
+    const apiKey = ''; // handled server-side
+    const resp = await fetch('/api/suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ markName: mark, classCode, score, risks, conflicts })
+    });
+
+    if (!resp.ok) throw new Error('Suggestion API failed');
+    const data = await resp.json();
+    const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+
+    if (suggestions.length === 0) throw new Error('No suggestions returned');
+
+    const grid = suggestions.map(s => `
+      <div class="suggestion-item" onclick="trySuggestion('${s.name}')">
+        <div class="suggestion-score-badge">↑ Higher Approval</div>
+        <div class="suggestion-name">${s.name}</div>
+        <div class="suggestion-why">${s.reason}</div>
+      </div>`).join('');
+
+    container.innerHTML = `
+      <div class="suggestions-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;flex-wrap:wrap;gap:1rem">
+          <div class="section-label" style="margin-bottom:0">Alternative Name Suggestions</div>
+          <button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button>
+        </div>
+        <p class="suggestions-intro">Your score of <strong style="color:${score >= 40 ? 'var(--yellow)' : 'var(--red)'}">${score}%</strong> suggests trademark conflicts. These alternatives are designed to avoid the identified conflicts while preserving your brand intent.</p>
+        <div class="suggestion-grid">${grid}</div>
+        <div class="try-name-hint">↑ Click any name to instantly scan it</div>
+      </div>`;
+  } catch (e) {
+    container.innerHTML = `
+      <div class="suggestions-card">
+        <div class="section-label" style="margin-bottom:1rem">Alternative Name Suggestions</div>
+        <div class="error-box">Could not generate suggestions: ${e.message}</div>
+      </div>`;
+  }
+}
+
+function trySuggestion(name) {
+  document.getElementById('markInput').value = name;
+  document.getElementById('markInput').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => runScan(), 300);
+}
+
 // ─── PDF EXPORT ──────────────────────────────────────────────
 function downloadPDF(mark, classCode, score, analysis, usptoData) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const W = 210; const margin = 18; const contentW = W - margin * 2;
   let y = 0;
-
   const verdict = (analysis.verdict || 'N/A').toUpperCase();
   const scoreColor = score >= 70 ? [71,255,138] : score >= 40 ? [255,204,71] : [255,71,71];
-
-  // Header bar
-  doc.setFillColor(10,10,10);
-  doc.rect(0, 0, W, 28, 'F');
-  doc.setFillColor(...scoreColor);
-  doc.rect(0, 0, 5, 28, 'F');
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(18);
-  doc.setTextColor(232,255,71);
+  doc.setFillColor(10,10,10); doc.rect(0, 0, W, 28, 'F');
+  doc.setFillColor(...scoreColor); doc.rect(0, 0, 5, 28, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(232,255,71);
   doc.text('TRADEMARKYO', margin, 12);
-  doc.setFontSize(8);
-  doc.setTextColor(100,100,100);
+  doc.setFontSize(8); doc.setTextColor(100,100,100);
   doc.text('USPTO TRADEMARK CLEARANCE REPORT', margin, 19);
   doc.setTextColor(180,180,180);
   doc.text(`Generated: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, margin, 25);
   y = 38;
-
-  // Mark + Score
-  doc.setFillColor(17,17,17);
-  doc.rect(margin, y, contentW, 28, 'F');
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(24);
-  doc.setTextColor(240,240,240);
+  doc.setFillColor(17,17,17); doc.rect(margin, y, contentW, 28, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(240,240,240);
   doc.text(mark, margin + 6, y + 13);
-  if (classCode) {
-    doc.setFontSize(9);
-    doc.setTextColor(100,100,100);
-    doc.text(`Class ${classCode}`, margin + 6, y + 21);
-  }
-  // Score circle area
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(28);
-  doc.setTextColor(...scoreColor);
+  if (classCode) { doc.setFontSize(9); doc.setTextColor(100,100,100); doc.text(`Class ${classCode}`, margin + 6, y + 21); }
+  doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(...scoreColor);
   doc.text(String(score), W - margin - 22, y + 14);
-  doc.setFontSize(7);
-  doc.setTextColor(100,100,100);
-  doc.text('APPROVAL SCORE', W - margin - 28, y + 21);
-  doc.setFontSize(8);
-  doc.setTextColor(...scoreColor);
-  doc.text(verdict, W - margin - 16, y + 26);
+  doc.setFontSize(7); doc.setTextColor(100,100,100); doc.text('APPROVAL SCORE', W - margin - 28, y + 21);
+  doc.setFontSize(8); doc.setTextColor(...scoreColor); doc.text(verdict, W - margin - 16, y + 26);
   y += 34;
-
-  // Stats row
   const statW = contentW / 4;
   const stats = [
     { label: 'RECORDS REVIEWED', val: String(usptoData.totalFound || 0) },
@@ -425,130 +469,66 @@ function downloadPDF(mark, classCode, score, analysis, usptoData) {
   ];
   stats.forEach((s, i) => {
     const x = margin + i * statW;
-    doc.setFillColor(26,26,26);
-    doc.rect(x, y, statW - 1, 16, 'F');
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(13);
-    doc.setTextColor(232,255,71);
+    doc.setFillColor(26,26,26); doc.rect(x, y, statW - 1, 16, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(232,255,71);
     doc.text(s.val, x + statW/2 - 2, y + 9, { align: 'center' });
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(6);
-    doc.setTextColor(100,100,100);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(100,100,100);
     doc.text(s.label, x + statW/2 - 2, y + 14, { align: 'center' });
   });
   y += 22;
-
-  // Distinctiveness
   if (analysis.distinctiveness) {
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(8);
-    doc.setTextColor(150,150,150);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150,150,150);
     const lines = doc.splitTextToSize(`DISTINCTIVENESS: ${analysis.distinctiveness}`, contentW);
-    doc.text(lines, margin, y);
-    y += lines.length * 4 + 4;
+    doc.text(lines, margin, y); y += lines.length * 4 + 4;
   }
-
-  // Recommendation
-  doc.setFillColor(15,15,15);
-  doc.setDrawColor(232,255,71);
-  doc.setLineWidth(0.5);
+  doc.setFillColor(15,15,15); doc.setDrawColor(232,255,71); doc.setLineWidth(0.5);
   doc.rect(margin, y, contentW, 6, 'F');
-  doc.setFont('helvetica','bold');
-  doc.setFontSize(7);
-  doc.setTextColor(232,255,71);
-  doc.text('AI RECOMMENDATION', margin + 3, y + 4);
-  y += 8;
-
-  doc.setFillColor(15,15,15);
-  doc.rect(margin, y, contentW, 1, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(232,255,71);
+  doc.text('AI RECOMMENDATION', margin + 3, y + 4); y += 8;
   const recLines = doc.splitTextToSize(analysis.recommendation || '', contentW - 6);
-  doc.setFillColor(15,15,15);
-  doc.rect(margin, y, contentW, recLines.length * 4.5 + 6, 'F');
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(220,220,220);
-  doc.text(recLines, margin + 3, y + 5);
-  y += recLines.length * 4.5 + 10;
-
-  // Risk factors
+  doc.setFillColor(15,15,15); doc.rect(margin, y, contentW, recLines.length * 4.5 + 6, 'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(220,220,220);
+  doc.text(recLines, margin + 3, y + 5); y += recLines.length * 4.5 + 10;
   if ((analysis.mainRisks||[]).length > 0) {
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(7);
-    doc.setTextColor(100,100,100);
-    doc.text('KEY RISK FACTORS', margin, y);
-    y += 5;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text('KEY RISK FACTORS', margin, y); y += 5;
     analysis.mainRisks.forEach(r => {
       const rlines = doc.splitTextToSize(`▸  ${r}`, contentW - 4);
-      doc.setFont('helvetica','normal');
-      doc.setFontSize(8);
-      doc.setTextColor(180,180,180);
-      doc.text(rlines, margin + 2, y);
-      y += rlines.length * 4 + 2;
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(180,180,180);
+      doc.text(rlines, margin + 2, y); y += rlines.length * 4 + 2;
     });
     y += 4;
   }
-
-  // Conflicts table
   const conflicts = analysis.conflictAnalysis || [];
   if (conflicts.length > 0) {
     if (y > 220) { doc.addPage(); y = 20; }
-    doc.setFont('helvetica','bold');
-    doc.setFontSize(7);
-    doc.setTextColor(100,100,100);
-    doc.text(`CONFLICT ANALYSIS (${conflicts.length} MARKS)`, margin, y);
-    y += 6;
-
-    conflicts.forEach((c, i) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(100,100,100);
+    doc.text(`CONFLICT ANALYSIS (${conflicts.length} MARKS)`, margin, y); y += 6;
+    conflicts.forEach((c) => {
       if (y > 260) { doc.addPage(); y = 20; }
       const risk = (c.riskLevel || 'medium').toUpperCase();
       const rColor = risk === 'HIGH' ? [255,71,71] : risk === 'MEDIUM' ? [255,204,71] : [71,255,138];
       const isLive = String(c.status||'').toUpperCase().includes('LIVE');
-
-      doc.setFillColor(17,17,17);
-      doc.rect(margin, y, contentW, 20, 'F');
-      doc.setFillColor(...rColor);
-      doc.rect(margin, y, 3, 20, 'F');
-
-      doc.setFont('helvetica','bold');
-      doc.setFontSize(10);
-      doc.setTextColor(240,240,240);
+      doc.setFillColor(17,17,17); doc.rect(margin, y, contentW, 20, 'F');
+      doc.setFillColor(...rColor); doc.rect(margin, y, 3, 20, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(240,240,240);
       doc.text(c.markName || 'N/A', margin + 6, y + 7);
-
-      doc.setFont('helvetica','normal');
-      doc.setFontSize(7);
-      doc.setTextColor(100,100,100);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(100,100,100);
       doc.text(`Serial: ${c.serialNumber || 'N/A'}`, margin + 6, y + 12);
-
-      doc.setFont('helvetica','bold');
-      doc.setFontSize(7);
-      doc.setTextColor(...rColor);
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...rColor);
       doc.text(`${risk} RISK`, W - margin - 5, y + 7, { align: 'right' });
-
       doc.setFont('helvetica','normal');
       doc.setTextColor(isLive ? 71 : 100, isLive ? 255 : 100, isLive ? 138 : 100);
       doc.text(isLive ? '● LIVE' : '○ DEAD', W - margin - 5, y + 13, { align: 'right' });
-
       const goodsText = (c.goodsServicesOverlap || '').substring(0, 90);
-      if (goodsText) {
-        doc.setFont('helvetica','normal');
-        doc.setFontSize(7);
-        doc.setTextColor(130,130,130);
-        doc.text(goodsText + (goodsText.length >= 90 ? '...' : ''), margin + 6, y + 17);
-      }
+      if (goodsText) { doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(130,130,130); doc.text(goodsText + (goodsText.length >= 90 ? '...' : ''), margin + 6, y + 17); }
       y += 22;
     });
   }
-
-  // Footer
-  doc.setFillColor(10,10,10);
-  doc.rect(0, 285, W, 12, 'F');
-  doc.setFont('helvetica','normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(80,80,80);
+  doc.setFillColor(10,10,10); doc.rect(0, 285, W, 12, 'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(80,80,80);
   doc.text('NOT LEGAL ADVICE — This report is for informational purposes only. Consult a licensed trademark attorney before filing.', margin, 292);
-  doc.setTextColor(100,100,100);
-  doc.text('trademarkyo.com', W - margin, 292, { align: 'right' });
-
+  doc.setTextColor(100,100,100); doc.text('trademarkyo.com', W - margin, 292, { align: 'right' });
   doc.save(`Trademarkyo_${mark.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
@@ -563,6 +543,10 @@ async function runScan() {
   const btn = document.getElementById('scanBtn');
   if (!mark) { document.getElementById('markInput').focus(); return; }
 
+  _currentMark = mark;
+  _currentClass = classCode;
+  document.getElementById('suggestionsContainer').innerHTML = '';
+
   btn.disabled = true;
   container.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Scanning USPTO Database</div><div class="loading-step" id="loadingStep">Connecting to live USPTO...</div></div>`;
   const updateStep = (msg) => { const el = document.getElementById('loadingStep'); if (el) el.textContent = msg; };
@@ -575,14 +559,12 @@ async function runScan() {
     });
     if (!searchRes.ok) throw new Error(`Search failed (${searchRes.status})`);
     const searchData = await searchRes.json();
-
     const usptoData = {
       liveSearch: searchData.mode !== 'ai_only',
       mode: searchData.mode,
       totalFound: Array.isArray(searchData.results) ? searchData.results.length : 0,
       results: Array.isArray(searchData.results) ? searchData.results : [],
     };
-
     updateStep(`Found ${usptoData.totalFound} marks — running AI DuPont analysis...`);
     const analysisRes = await fetch(`${API_BASE}/api/analyze`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -590,9 +572,14 @@ async function runScan() {
     });
     if (!analysisRes.ok) throw new Error(`Analysis failed (${analysisRes.status})`);
     const analysis = await analysisRes.json();
-
     _lastScanData = { mark, classCode, usptoData, analysis };
+    _currentAnalysis = analysis;
     renderResults(mark, classCode, usptoData, analysis);
+
+    // Generate suggestions if score < 70
+    if (Number(analysis.approvalScore || 0) < 70) {
+      generateSuggestions(mark, classCode, analysis);
+    }
   } catch (err) {
     container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
   }
@@ -605,80 +592,53 @@ function renderResults(mark, classCode, usptoData, analysis) {
   const scoreClass = score >= 70 ? 'score-green' : score >= 40 ? 'score-yellow' : 'score-red';
   const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
   const conflicts = Array.isArray(analysis.conflictAnalysis) ? analysis.conflictAnalysis : [];
-
   const normalizedConflicts = conflicts.map(c => {
     const status = String(c.status || '').toUpperCase();
     const isLive = status.includes('LIVE') || status === 'LIVE';
-    return {
-      serialNumber: c.serialNumber || null,
-      mark: c.markName || null,
-      goods: c.goodsServicesOverlap || '',
-      isLive,
-      riskLevel: String(c.riskLevel || 'medium').toUpperCase(),
-      reason: c.similarity || ''
-    };
+    return { serialNumber: c.serialNumber || null, mark: c.markName || null, goods: c.goodsServicesOverlap || '', isLive, riskLevel: String(c.riskLevel || 'medium').toUpperCase(), reason: c.similarity || '' };
   });
-
   _conflictStore = normalizedConflicts;
-
   const liveConflicts = normalizedConflicts.filter(c => c.isLive).length;
   const deadConflicts = normalizedConflicts.filter(c => !c.isLive).length;
-
   const conflictsHTML = normalizedConflicts.length > 0
     ? `<div class="click-hint">Click any row for full detail →</div>` +
       normalizedConflicts.map((c, i) => {
         const risk = c.riskLevel || 'MEDIUM';
         const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
         return `<div class="conflict-item" onclick="openModal(${i})">
-          <div>
-            <div class="conflict-mark">${c.mark || 'N/A'}</div>
-            <div class="conflict-goods">${c.goods ? c.goods.substring(0,120) + (c.goods.length > 120 ? '...' : '') : 'No goods description'}</div>
-          </div>
-          <div>
-            <div class="conflict-serial">${c.serialNumber || ''}</div>
-            <div style="margin-top:0.3rem"><span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span></div>
-          </div>
-          <div style="text-align:right">
-            <span class="risk-tag ${riskClass}">${risk} RISK</span>
-            ${c.reason ? `<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>` : ''}
-          </div>
+          <div><div class="conflict-mark">${c.mark || 'N/A'}</div><div class="conflict-goods">${c.goods ? c.goods.substring(0,120)+(c.goods.length>120?'...':'') : 'No goods description'}</div></div>
+          <div><div class="conflict-serial">${c.serialNumber || ''}</div><div style="margin-top:0.3rem"><span class="status-tag ${c.isLive?'live':'dead'}">${c.isLive?'● LIVE':'○ DEAD'}</span></div></div>
+          <div style="text-align:right"><span class="risk-tag ${riskClass}">${risk} RISK</span>${c.reason?`<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>`:''}</div>
         </div>`;
       }).join('')
     : '<div class="no-conflicts">✓ NO CONFLICTING MARKS IDENTIFIED</div>';
-
   const risksHTML = (analysis.mainRisks || []).map(r =>
-    `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted);display:flex;gap:0.75rem"><span style="color:var(--accent);flex-shrink:0">▸</span>${r}</div>`
-  ).join('');
-
-  const sourceTag = usptoData.liveSearch
-    ? `<span class="source-tag source-live">● LIVE SEARCH</span>`
-    : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
-
+    `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted);display:flex;gap:0.75rem"><span style="color:var(--accent);flex-shrink:0">▸</span>${r}</div>`).join('');
+  const sourceTag = usptoData.liveSearch ? `<span class="source-tag source-live">● LIVE SEARCH</span>` : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
   const classLabel = classCode ? ` · Class ${classCode}` : '';
-
   container.innerHTML = `<div class="verdict-card">
     <div class="verdict-header">
       <div>
         <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
         <div class="verdict-mark">${mark}</div>
-        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">${analysis.distinctiveness || ''}${classLabel}</div>
+        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">${analysis.distinctiveness||''}${classLabel}</div>
       </div>
       <div class="score-display">
         <span class="score-number ${scoreClass}">${score}</span>
         <span class="score-label">Approval Likelihood</span>
-        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict || ''}</div>
+        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict||''}</div>
       </div>
     </div>
     <div class="verdict-bar"><div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div></div>
     <div class="stats-row">
-      <div class="stat-box"><span class="stat-num">${usptoData.totalFound || 0}</span><span class="stat-lbl">Records Reviewed</span></div>
+      <div class="stat-box"><span class="stat-num">${usptoData.totalFound||0}</span><span class="stat-lbl">Records Reviewed</span></div>
       <div class="stat-box"><span class="stat-num" style="color:var(--red)">${liveConflicts}</span><span class="stat-lbl">Live Conflicts</span></div>
       <div class="stat-box"><span class="stat-num" style="color:var(--muted)">${deadConflicts}</span><span class="stat-lbl">Dead Marks</span></div>
       <div class="stat-box"><span class="stat-num" style="color:${barColor}">${score}%</span><span class="stat-lbl">Approval Score</span></div>
     </div>
     <div class="section-label">AI Recommendation</div>
-    <div class="verdict-analysis">${analysis.recommendation || 'No recommendation generated.'}</div>
-    ${risksHTML ? `<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}` : ''}
+    <div class="verdict-analysis">${analysis.recommendation||'No recommendation generated.'}</div>
+    ${risksHTML?`<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}`:''}
     <div class="section-label" style="margin-top:2rem;justify-content:space-between">
       <span style="display:flex;align-items:center;gap:0.75rem">Conflict Analysis (${normalizedConflicts.length} marks reviewed)<span style="flex:1;height:1px;background:var(--border);display:block;min-width:40px"></span></span>
       <button class="btn-pdf" onclick="downloadPDF('${mark}','${classCode}',${score},_lastScanData.analysis,_lastScanData.usptoData)">
@@ -688,7 +648,6 @@ function renderResults(mark, classCode, usptoData, analysis) {
     </div>
     ${conflictsHTML}
   </div>`;
-
   setTimeout(() => { const bar = document.getElementById('barFill'); if (bar) bar.style.width = score + '%'; }, 100);
 }
 
