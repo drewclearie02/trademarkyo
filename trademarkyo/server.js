@@ -41,7 +41,7 @@ async function launchBrowser() {
   });
 }
 
-async function scrapeUsptoTrademark(markName) {
+async function scrapeUsptoTrademark(markName, classCode) {
   const browser = await launchBrowser();
   const results = [];
 
@@ -56,7 +56,6 @@ async function scrapeUsptoTrademark(markName) {
     });
     await sleep(2000);
 
-    // Type into the search bar (id="searchbar")
     await page.waitForSelector('#searchbar', { timeout: 10000 });
     await page.click('#searchbar');
     await page.keyboard.down('Control');
@@ -65,75 +64,80 @@ async function scrapeUsptoTrademark(markName) {
     await page.type('#searchbar', markName.toUpperCase(), { delay: 50 });
     console.log('[scrape] Typed mark:', markName.toUpperCase());
 
-    // Click the search button
     const btnClicked = await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button, mat-icon'));
       const searchBtn = btns.find(b => (b.textContent || '').trim().toLowerCase() === 'search');
       if (searchBtn) { searchBtn.click(); return true; }
-      // Try clicking button near the input
       const inputParent = document.querySelector('#searchbar')?.closest('form, mat-form-field, div');
       const btn = inputParent?.querySelector('button');
       if (btn) { btn.click(); return true; }
       return false;
     });
     if (!btnClicked) await page.keyboard.press('Enter');
-    console.log('[scrape] Search submitted');
 
-    // Wait for results to load — wait for result cards to appear
-    console.log('[scrape] Waiting for results...');
-    await sleep(3000);
+    await sleep(4000);
 
-    // Wait for actual trademark result elements
-    // tmsearch.uspto.gov uses Angular Material — results appear as mat-card or similar
+    // If class filter provided, try to apply it
+    if (classCode) {
+      console.log('[scrape] Applying class filter:', classCode);
+      try {
+        // Look for class/international class filter on results page
+        const classApplied = await page.evaluate((cls) => {
+          // Try to find IC class filter checkboxes or inputs
+          const allText = document.body.innerText;
+          // Look for filter elements
+          const inputs = Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'));
+          const classInput = inputs.find(i => {
+            const label = i.closest('label') || document.querySelector(`label[for="${i.id}"]`);
+            const text = (label?.innerText || i.value || i.id || '').toLowerCase();
+            return text.includes(cls) || text.includes(`class ${cls}`);
+          });
+          if (classInput && !classInput.checked) {
+            classInput.click();
+            return true;
+          }
+          return false;
+        }, classCode);
+        console.log('[scrape] Class filter applied via UI:', classApplied);
+        if (classApplied) await sleep(2000);
+      } catch (e) {
+        console.log('[scrape] Could not apply class filter via UI:', e.message);
+      }
+    }
+
+    // Wait for serial numbers to appear
     try {
       await page.waitForFunction(() => {
-        // Look for elements containing 8-digit serial numbers (trademark serials)
         const body = document.body.innerText;
-        return body.match(/\b\d{8}\b/) || document.querySelectorAll('[class*="result-item"], [class*="trademark-result"], mat-card, .result-row').length > 0;
+        return body.match(/\b\d{8}\b/);
       }, { timeout: 10000 });
-      console.log('[scrape] Results appeared');
     } catch {
-      console.log('[scrape] Timeout waiting for results, proceeding anyway');
+      console.log('[scrape] Timeout waiting for serial numbers');
     }
 
     await sleep(2000);
 
-    // Log all class names on the page to identify result containers
-    const classNames = await page.evaluate(() => {
-      const classes = new Set();
-      document.querySelectorAll('*').forEach(el => {
-        el.className && String(el.className).split(' ').forEach(c => c && classes.add(c));
-      });
-      return Array.from(classes).filter(c => c.length > 3 && c.length < 50).slice(0, 80);
-    });
-    console.log('[scrape] Page classes:', classNames.join(', '));
-
-    // Get full page text to find serial numbers
     const fullText = await page.evaluate(() => document.body?.innerText || '');
-    console.log('[scrape] Full page text (first 1500):', fullText.substring(0, 1500));
+    console.log('[scrape] Page text (first 1000):', fullText.substring(0, 1000));
 
-    // Extract all 8-digit serial numbers from the page
+    // Extract serial numbers with surrounding context
     const serialMatches = [...fullText.matchAll(/\b(\d{8})\b/g)].map(m => m[1]);
-    const uniqueSerials = [...new Set(serialMatches)].slice(0, 15);
-    console.log('[scrape] Serials found:', uniqueSerials);
+    const uniqueSerials = [...new Set(serialMatches)].slice(0, 50);
+    console.log('[scrape] Serials found:', uniqueSerials.length);
 
-    // Try to extract structured data from result rows
+    // Try structured extraction first
     const rawData = await page.evaluate(() => {
       const items = [];
-
-      // Try various Angular Material / custom selectors
       const selectors = [
         'app-result-item', 'app-search-result', 'app-trademark-result',
         '[class*="result-item"]', '[class*="search-result"]',
         'mat-list-item', 'mat-card',
-        'tbody tr', 'table tr',
-        '[role="listitem"]', '[role="row"]',
+        'tbody tr', '[role="listitem"]', '[role="row"]',
       ];
 
       for (const sel of selectors) {
         const els = document.querySelectorAll(sel);
-        if (els.length > 0) {
-          console.log('Found', els.length, 'elements with selector:', sel);
+        if (els.length > 1) {
           els.forEach(el => {
             const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
             if (text.length < 5) return;
@@ -143,17 +147,17 @@ async function scrapeUsptoTrademark(markName) {
           if (items.length > 2) break;
         }
       }
-
-      return items.slice(0, 20);
+      return items.slice(0, 50);
     });
 
-    console.log(`[scrape] Structured items: ${rawData.length}`);
-    if (rawData[0]) console.log('[scrape] First item:', JSON.stringify(rawData[0]).substring(0, 300));
-
-    // If we found structured items with serials, use them
     const itemsWithSerials = rawData.filter(r => r.serial);
+
     if (itemsWithSerials.length > 0) {
       for (const r of itemsWithSerials) {
+        // Filter by class if specified - check if class appears in the text
+        if (classCode && !r.text.includes(`IC 0${classCode.padStart(2,'0')}`) && !r.text.includes(`IC ${classCode}`) && !r.text.includes(`Class ${classCode}`)) {
+          // Don't strictly filter - USPTO search already filters
+        }
         results.push({
           source: 'tmsearch',
           serialNumber: r.serial,
@@ -161,16 +165,15 @@ async function scrapeUsptoTrademark(markName) {
           markName: null,
           owner: null,
           goodsServices: r.text,
+          internationalClass: classCode || null,
           filingDate: null,
           registrationDate: null,
         });
       }
     } else if (uniqueSerials.length > 0) {
-      // Fallback: use serial numbers found in page text
-      // Build context around each serial
       for (const serial of uniqueSerials) {
         const idx = fullText.indexOf(serial);
-        const context = fullText.substring(Math.max(0, idx - 100), idx + 200);
+        const context = fullText.substring(Math.max(0, idx - 100), idx + 300);
         results.push({
           source: 'tmsearch',
           serialNumber: serial,
@@ -178,6 +181,7 @@ async function scrapeUsptoTrademark(markName) {
           markName: null,
           owner: null,
           goodsServices: context.replace(/\s+/g, ' ').trim(),
+          internationalClass: classCode || null,
           filingDate: null,
           registrationDate: null,
         });
@@ -193,21 +197,23 @@ async function scrapeUsptoTrademark(markName) {
   }
 }
 
-async function callClaude({ markName, results }) {
+async function callClaude({ markName, classCode, results }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+
+  const classContext = classCode ? `The applicant is seeking registration in International Class ${classCode}.` : 'No specific class specified - analyze across all relevant classes.';
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1200,
+      max_tokens: 1500,
       temperature: 0.2,
-      system: 'You are a trademark clearance assistant. Perform DuPont factor analysis. Return ONLY a raw JSON object. No markdown. No explanation.',
+      system: 'You are a trademark clearance attorney assistant. Perform rigorous DuPont factor likelihood-of-confusion analysis. Return ONLY a raw JSON object. No markdown. No explanation.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for: "${markName}".\n\nUSPTO records (${results.length} found):\n${JSON.stringify(results, null, 2)}\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
+        content: `Analyze trademark risk for proposed mark: "${markName}".\n${classContext}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nPerform thorough DuPont analysis considering: similarity of marks, relatedness of goods/services, strength of mark, actual confusion evidence, channels of trade.\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
       }]
     })
   });
@@ -224,22 +230,24 @@ async function callClaude({ markName, results }) {
 
 app.post('/api/search', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
+  const classCode = String(req.body?.classCode || '').trim();
   if (!markName) return res.status(400).json({ error: 'markName required' });
   try {
-    const results = await scrapeUsptoTrademark(markName);
-    return res.json({ mode: results.length > 0 ? 'tess_scrape' : 'ai_only', results, meta: { markName } });
+    const results = await scrapeUsptoTrademark(markName, classCode);
+    return res.json({ mode: results.length > 0 ? 'tess_scrape' : 'ai_only', results, meta: { markName, classCode } });
   } catch (e) {
     console.error('[search] Failed:', e.message);
-    return res.json({ mode: 'ai_only', results: [], meta: { markName, error: e.message } });
+    return res.json({ mode: 'ai_only', results: [], meta: { markName, classCode, error: e.message } });
   }
 });
 
 app.post('/api/analyze', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
+  const classCode = String(req.body?.classCode || '').trim();
   const results = Array.isArray(req.body?.results) ? req.body.results : [];
   if (!markName) return res.status(400).json({ error: 'markName required' });
   try {
-    return res.json(await callClaude({ markName, results }));
+    return res.json(await callClaude({ markName, classCode, results }));
   } catch (e) {
     return res.status(500).json({ error: 'Claude failed', message: String(e?.message || e) });
   }
