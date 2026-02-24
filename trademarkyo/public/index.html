@@ -18,555 +18,88 @@
     --yellow: #ffcc47;
     --red: #ff4747;
   }
-
   * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 999;
-    opacity: 0.4;
-  }
-
-  .header {
-    padding: 2rem 3rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .logo {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 1.8rem;
-    letter-spacing: 0.1em;
-    color: var(--accent);
-  }
-
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 999; opacity: 0.4; }
+  .header { padding: 2rem 3rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .logo { font-family: 'Bebas Neue', cursive; font-size: 1.8rem; letter-spacing: 0.1em; color: var(--accent); }
   .logo span { color: var(--text); }
-
-  .badge {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    border: 1px solid var(--border);
-    padding: 0.3rem 0.7rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-  }
-
-  .live-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--green);
-    letter-spacing: 0.1em;
-  }
-
-  .live-dot {
-    width: 6px;
-    height: 6px;
-    background: var(--green);
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
-
-  .hero {
-    padding: 5rem 3rem 3rem;
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  .hero-eyebrow {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--accent);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .hero-eyebrow::before {
-    content: '';
-    width: 2rem;
-    height: 1px;
-    background: var(--accent);
-  }
-
-  h1 {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(3.5rem, 8vw, 7rem);
-    line-height: 0.95;
-    letter-spacing: 0.02em;
-    margin-bottom: 1.5rem;
-  }
-
+  .badge { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); border: 1px solid var(--border); padding: 0.3rem 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; }
+  .live-indicator { display: flex; align-items: center; gap: 0.5rem; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--green); letter-spacing: 0.1em; }
+  .live-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .hero { padding: 5rem 3rem 3rem; max-width: 900px; margin: 0 auto; }
+  .hero-eyebrow { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--accent); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
+  .hero-eyebrow::before { content: ''; width: 2rem; height: 1px; background: var(--accent); }
+  h1 { font-family: 'Bebas Neue', cursive; font-size: clamp(3.5rem, 8vw, 7rem); line-height: 0.95; letter-spacing: 0.02em; margin-bottom: 1.5rem; }
   h1 .highlight { color: var(--accent); display: block; }
-
-  .hero-sub {
-    font-size: 1rem;
-    color: var(--muted);
-    max-width: 500px;
-    line-height: 1.6;
-    font-weight: 300;
-    margin-bottom: 3rem;
-  }
-
-  .search-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 0 3rem 3rem;
-  }
-
-  .search-box {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 2rem;
-    position: relative;
-  }
-
-  .search-box::before {
-    content: '';
-    position: absolute;
-    top: -1px;
-    left: 0;
-    width: 4rem;
-    height: 3px;
-    background: var(--accent);
-  }
-
-  .field-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 0.75rem;
-    display: block;
-  }
-
-  .input-row {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  input[type="text"] {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 1.4rem;
-    font-weight: 600;
-    padding: 1rem 1.25rem;
-    outline: none;
-    transition: border-color 0.2s;
-    letter-spacing: 0.05em;
-  }
-
+  .hero-sub { font-size: 1rem; color: var(--muted); max-width: 500px; line-height: 1.6; font-weight: 300; margin-bottom: 3rem; }
+  .search-container { max-width: 900px; margin: 0 auto; padding: 0 3rem 3rem; }
+  .search-box { background: var(--surface); border: 1px solid var(--border); padding: 2rem; position: relative; }
+  .search-box::before { content: ''; position: absolute; top: -1px; left: 0; width: 4rem; height: 3px; background: var(--accent); }
+  .field-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.75rem; display: block; }
+  .input-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+  input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 1.4rem; font-weight: 600; padding: 1rem 1.25rem; outline: none; transition: border-color 0.2s; letter-spacing: 0.05em; }
   input[type="text"]:focus { border-color: var(--accent); }
   input[type="text"]::placeholder { color: var(--muted); font-weight: 300; font-size: 1.2rem; }
-
-  .class-select {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.8rem;
-    padding: 1rem;
-    outline: none;
-    cursor: pointer;
-    min-width: 220px;
-  }
-
+  .class-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.75rem; padding: 1rem; outline: none; cursor: pointer; min-width: 260px; }
   .class-select:focus { border-color: var(--accent); }
-
-  .btn-scan {
-    width: 100%;
-    background: var(--accent);
-    color: #000;
-    border: none;
-    font-family: 'Bebas Neue', cursive;
-    font-size: 1.4rem;
-    letter-spacing: 0.1em;
-    padding: 1.1rem;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
+  .class-select optgroup { color: var(--muted); font-size: 0.65rem; }
+  .btn-scan { width: 100%; background: var(--accent); color: #000; border: none; font-family: 'Bebas Neue', cursive; font-size: 1.4rem; letter-spacing: 0.1em; padding: 1.1rem; cursor: pointer; transition: all 0.15s; }
   .btn-scan:hover { background: #fff; }
   .btn-scan:active { transform: scale(0.99); }
   .btn-scan:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
-
-  .results-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 0 3rem 5rem;
-  }
-
-  .verdict-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 2.5rem;
-    margin-bottom: 2rem;
-    animation: slideUp 0.4s ease forwards;
-  }
-
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .verdict-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 2rem;
-    gap: 2rem;
-  }
-
-  .verdict-title {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-  }
-
-  .verdict-mark {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 3rem;
-    letter-spacing: 0.05em;
-  }
-
+  .results-container { max-width: 900px; margin: 0 auto; padding: 0 3rem 5rem; }
+  .verdict-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.4s ease forwards; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .verdict-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2rem; gap: 2rem; }
+  .verdict-title { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .verdict-mark { font-family: 'Bebas Neue', cursive; font-size: 3rem; letter-spacing: 0.05em; }
   .score-display { text-align: right; flex-shrink: 0; }
-
-  .score-number {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 5rem;
-    line-height: 1;
-    display: block;
-  }
-
-  .score-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
+  .score-number { font-family: 'Bebas Neue', cursive; font-size: 5rem; line-height: 1; display: block; }
+  .score-label { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
   .score-green { color: var(--green); }
   .score-yellow { color: var(--yellow); }
   .score-red { color: var(--red); }
-
-  .verdict-bar {
-    height: 4px;
-    background: var(--border);
-    margin-bottom: 2rem;
-    overflow: hidden;
-  }
-
+  .verdict-bar { height: 4px; background: var(--border); margin-bottom: 2rem; overflow: hidden; }
   .verdict-bar-fill { height: 100%; transition: width 1s cubic-bezier(0.4,0,0.2,1); }
-
-  .verdict-analysis {
-    font-size: 0.95rem;
-    color: var(--text);
-    line-height: 1.7;
-    font-weight: 300;
-    margin-bottom: 2rem;
-    padding: 1.5rem;
-    background: var(--bg);
-    border-left: 3px solid var(--accent);
-  }
-
-  .section-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 1rem;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  .conflict-item {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 0.5rem;
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 1rem;
-    align-items: center;
-    transition: border-color 0.2s;
-  }
-
+  .verdict-analysis { font-size: 0.95rem; color: var(--text); line-height: 1.7; font-weight: 300; margin-bottom: 2rem; padding: 1.5rem; background: var(--bg); border-left: 3px solid var(--accent); }
+  .section-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .conflict-item { background: var(--bg); border: 1px solid var(--border); padding: 1.25rem 1.5rem; margin-bottom: 0.5rem; display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center; transition: border-color 0.2s; }
   .conflict-item:hover { border-color: var(--muted); }
-
   .conflict-mark { font-weight: 600; font-size: 1rem; letter-spacing: 0.05em; }
-
   .conflict-goods { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; font-weight: 300; }
-
   .conflict-serial { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); }
-
-  .risk-tag {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    padding: 0.3rem 0.6rem;
-    font-weight: 500;
-  }
-
+  .risk-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.3rem 0.6rem; font-weight: 500; }
   .risk-high { background: rgba(255,71,71,0.15); color: var(--red); }
   .risk-med { background: rgba(255,204,71,0.15); color: var(--yellow); }
   .risk-low { background: rgba(71,255,138,0.15); color: var(--green); }
-
-  .status-tag {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem;
-    letter-spacing: 0.1em;
-    padding: 0.2rem 0.5rem;
-    text-transform: uppercase;
-  }
-
+  .status-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; padding: 0.2rem 0.5rem; text-transform: uppercase; }
   .live { background: rgba(71,255,138,0.1); color: var(--green); }
   .dead { background: rgba(102,102,102,0.2); color: var(--muted); }
-
   .loading-state { padding: 4rem 0; text-align: center; }
-
-  .loading-spinner {
-    width: 2rem;
-    height: 2rem;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 1.5rem;
-  }
-
+  .loading-spinner { width: 2rem; height: 2rem; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  .loading-text {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--muted);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-  }
-
-  .loading-step {
-    margin-top: 0.5rem;
-    font-size: 0.7rem;
-    color: var(--accent);
-    font-family: 'DM Mono', monospace;
-    min-height: 1rem;
-  }
-
-  .error-box {
-    background: rgba(255,71,71,0.08);
-    border: 1px solid rgba(255,71,71,0.3);
-    padding: 1.5rem;
-    font-size: 0.9rem;
-    color: var(--red);
-    font-family: 'DM Mono', monospace;
-  }
-
-  .stats-row {
-    display: flex;
-    gap: 1px;
-    margin-bottom: 2rem;
-    background: var(--border);
-  }
-
-  .stat-box {
-    flex: 1;
-    background: var(--surface2);
-    padding: 1.25rem;
-    text-align: center;
-  }
-
-  .stat-num {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 2rem;
-    display: block;
-    color: var(--accent);
-  }
-
-  .stat-lbl {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem;
-    color: var(--muted);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-  }
-
-  .no-conflicts {
-    padding: 2rem;
-    text-align: center;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--green);
-    border: 1px dashed rgba(71,255,138,0.3);
-    letter-spacing: 0.1em;
-  }
-
-  .source-tag {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.6rem;
-    padding: 0.2rem 0.6rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
+  .loading-text { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+  .loading-step { margin-top: 0.5rem; font-size: 0.7rem; color: var(--accent); font-family: 'DM Mono', monospace; min-height: 1rem; }
+  .error-box { background: rgba(255,71,71,0.08); border: 1px solid rgba(255,71,71,0.3); padding: 1.5rem; font-size: 0.9rem; color: var(--red); font-family: 'DM Mono', monospace; }
+  .stats-row { display: flex; gap: 1px; margin-bottom: 2rem; background: var(--border); }
+  .stat-box { flex: 1; background: var(--surface2); padding: 1.25rem; text-align: center; }
+  .stat-num { font-family: 'Bebas Neue', cursive; font-size: 2rem; display: block; color: var(--accent); }
+  .stat-lbl { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+  .no-conflicts { padding: 2rem; text-align: center; font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--green); border: 1px dashed rgba(71,255,138,0.3); letter-spacing: 0.1em; }
+  .source-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; padding: 0.2rem 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; }
   .source-live { background: rgba(71,255,138,0.1); color: var(--green); }
   .source-ai { background: rgba(232,255,71,0.1); color: var(--accent); }
-
-  .disclaimer {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--muted);
-    line-height: 1.6;
-    padding: 2rem 3rem;
-    border-top: 1px solid var(--border);
-    max-width: 900px;
-    margin: 0 auto;
-    letter-spacing: 0.05em;
-  }
-
-/* =========================
-   Mobile responsiveness
-   Add at the END of <style>
-   ========================= */
-
-html, body { max-width: 100%; overflow-x: hidden; }
-
-input, select, button { max-width: 100%; }
-
-.conflict-mark,
-.verdict-mark,
-.verdict-analysis,
-.conflict-goods {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-/* Tablet and down */
-@media (max-width: 900px) {
-  .header { padding: 1.25rem 1.25rem; gap: 1rem; }
-  .hero { padding: 3rem 1.25rem 2rem; }
-  .search-container { padding: 0 1.25rem 2rem; }
-  .results-container { padding: 0 1.25rem 3rem; }
-  .disclaimer { padding: 1.5rem 1.25rem; }
-
-  .search-box { padding: 1.25rem; }
-
-  .input-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .class-select {
-    min-width: 0;
-    width: 100%;
-  }
-
-  input[type="text"] {
-    font-size: 1.15rem;
-    padding: 0.95rem 1rem;
-    letter-spacing: 0.02em;
-  }
-
-  .btn-scan {
-    font-size: 1.25rem;
-    padding: 1rem;
-  }
-
-  .verdict-card { padding: 1.5rem; }
-  .verdict-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  .score-display { text-align: left; }
-
-  .stats-row { flex-direction: column; }
-  .stat-box { text-align: left; }
-}
-
-/* Phone */
-@media (max-width: 520px) {
-  .header {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
-
-  /* Keep it clean on small screens */
-  .badge { display: none; }
-  .live-indicator { font-size: 0.6rem; }
-
-  h1 {
-    font-size: 3.1rem; /* overrides clamp for tiny screens */
-    line-height: 0.95;
-  }
-
-  .hero-sub { font-size: 0.95rem; }
-
-  .verdict-mark { font-size: 2.4rem; }
-  .score-number { font-size: 4rem; }
-
-  /* Conflict items collapse into stacked cards */
-  .conflict-item {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .conflict-serial { font-size: 0.75rem; }
-}
+  .disclaimer { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); line-height: 1.6; padding: 2rem 3rem; border-top: 1px solid var(--border); max-width: 900px; margin: 0 auto; letter-spacing: 0.05em; }
 </style>
 </head>
 <body>
-
 <header class="header">
   <div class="logo">TRADEMARK<span>YO</span></div>
   <div style="display:flex;align-items:center;gap:1.5rem">
-    <div class="live-indicator">
-      <div class="live-dot"></div>
-      LIVE USPTO DATA
-    </div>
+    <div class="live-indicator"><div class="live-dot"></div>LIVE USPTO DATA</div>
     <div class="badge">AI TRADEMARK ANALYSIS</div>
   </div>
 </header>
@@ -581,20 +114,58 @@ input, select, button { max-width: 100%; }
   <div class="search-box">
     <label class="field-label">Enter your trademark name</label>
     <div class="input-row">
-      <input type="text" id="markInput" placeholder="e.g. XYZ COMPANY" autocomplete="off" />
+      <input type="text" id="markInput" placeholder="e.g. GOLDYN" autocomplete="off" />
       <select class="class-select" id="classSelect">
         <option value="">All Classes</option>
-        <option value="5">Class 5 — Pharmaceuticals / Supplements</option>
-        <option value="29">Class 29 — Food (Processed)</option>
-        <option value="30">Class 30 — Food (Staple)</option>
-        <option value="32">Class 32 — Beverages</option>
-        <option value="35">Class 35 — Business / Retail</option>
-        <option value="42">Class 42 — Software / Tech</option>
-        <option value="25">Class 25 — Clothing</option>
-        <option value="3">Class 3 — Cosmetics</option>
-        <option value="9">Class 9 — Electronics</option>
-        <option value="41">Class 41 — Education</option>
-        <option value="44">Class 44 — Medical / Health</option>
+        <optgroup label="── Goods ──────────────">
+        <option value="1">Class 1 — Chemicals</option>
+        <option value="2">Class 2 — Paints & Coatings</option>
+        <option value="3">Class 3 — Cosmetics & Cleaning</option>
+        <option value="4">Class 4 — Lubricants & Fuels</option>
+        <option value="5">Class 5 — Pharmaceuticals & Supplements</option>
+        <option value="6">Class 6 — Metal Goods</option>
+        <option value="7">Class 7 — Machinery</option>
+        <option value="8">Class 8 — Hand Tools</option>
+        <option value="9">Class 9 — Electronics & Software</option>
+        <option value="10">Class 10 — Medical Devices</option>
+        <option value="11">Class 11 — Lighting & HVAC</option>
+        <option value="12">Class 12 — Vehicles</option>
+        <option value="13">Class 13 — Firearms</option>
+        <option value="14">Class 14 — Jewelry & Watches</option>
+        <option value="15">Class 15 — Musical Instruments</option>
+        <option value="16">Class 16 — Paper & Printed Matter</option>
+        <option value="17">Class 17 — Rubber & Plastics</option>
+        <option value="18">Class 18 — Leather Goods & Bags</option>
+        <option value="19">Class 19 — Building Materials</option>
+        <option value="20">Class 20 — Furniture</option>
+        <option value="21">Class 21 — Housewares & Glass</option>
+        <option value="22">Class 22 — Ropes & Fibers</option>
+        <option value="23">Class 23 — Yarns & Threads</option>
+        <option value="24">Class 24 — Textiles & Fabrics</option>
+        <option value="25">Class 25 — Clothing & Footwear</option>
+        <option value="26">Class 26 — Lace & Embroidery</option>
+        <option value="27">Class 27 — Carpets & Floor Coverings</option>
+        <option value="28">Class 28 — Games & Sporting Goods</option>
+        <option value="29">Class 29 — Food (Meat, Dairy, Processed)</option>
+        <option value="30">Class 30 — Food (Staple, Bakery, Coffee)</option>
+        <option value="31">Class 31 — Fresh Food & Agriculture</option>
+        <option value="32">Class 32 — Beverages (Non-Alcoholic)</option>
+        <option value="33">Class 33 — Alcoholic Beverages</option>
+        <option value="34">Class 34 — Tobacco & Smoking</option>
+        </optgroup>
+        <optgroup label="── Services ────────────">
+        <option value="35">Class 35 — Advertising & Business</option>
+        <option value="36">Class 36 — Financial & Insurance</option>
+        <option value="37">Class 37 — Construction & Repair</option>
+        <option value="38">Class 38 — Telecommunications</option>
+        <option value="39">Class 39 — Transport & Travel</option>
+        <option value="40">Class 40 — Treatment of Materials</option>
+        <option value="41">Class 41 — Education & Entertainment</option>
+        <option value="42">Class 42 — Software & Tech Services</option>
+        <option value="43">Class 43 — Food & Lodging Services</option>
+        <option value="44">Class 44 — Medical & Health Services</option>
+        <option value="45">Class 45 — Legal & Personal Services</option>
+        </optgroup>
       </select>
     </div>
     <button class="btn-scan" id="scanBtn" onclick="runScan()">ANALYZE WITH AI →</button>
@@ -608,7 +179,6 @@ input, select, button { max-width: 100%; }
 </div>
 
 <script>
-// Always use same-origin API (works on Railway domain + custom domain + localhost)
 const API_BASE = '';
 
 async function runScan() {
@@ -617,75 +187,44 @@ async function runScan() {
   const container = document.getElementById('resultsContainer');
   const btn = document.getElementById('scanBtn');
 
-  if (!mark) {
-    document.getElementById('markInput').focus();
-    return;
-  }
+  if (!mark) { document.getElementById('markInput').focus(); return; }
 
   btn.disabled = true;
+  container.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Scanning USPTO Database</div><div class="loading-step" id="loadingStep">Connecting to live USPTO...</div></div>`;
 
-  container.innerHTML = `
-    <div class="loading-state">
-      <div class="loading-spinner"></div>
-      <div class="loading-text">Scanning USPTO Database</div>
-      <div class="loading-step" id="loadingStep">Connecting to live USPTO...</div>
-    </div>`;
-
-  const updateStep = (msg) => {
-    const el = document.getElementById('loadingStep');
-    if (el) el.textContent = msg;
-  };
+  const updateStep = (msg) => { const el = document.getElementById('loadingStep'); if (el) el.textContent = msg; };
 
   try {
-    updateStep('Querying TESS (scrape) with fallback...');
+    updateStep('Querying USPTO trademark database...');
 
-    // ✅ NEW BACKEND CONTRACT:
-    // POST /api/search  body: { markName }
     const searchRes = await fetch(`${API_BASE}/api/search`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ markName: mark, classCode })
     });
 
-    if (!searchRes.ok) {
-      const txt = await searchRes.text().catch(() => '');
-      throw new Error(`Search failed (${searchRes.status})${txt ? ': ' + txt : ''}`);
-    }
-
+    if (!searchRes.ok) throw new Error(`Search failed (${searchRes.status})`);
     const searchData = await searchRes.json();
 
-    // Normalize searchData to your UI's expected shape
     const usptoData = {
       liveSearch: searchData.mode !== 'ai_only',
       mode: searchData.mode,
       totalFound: Array.isArray(searchData.results) ? searchData.results.length : 0,
       results: Array.isArray(searchData.results) ? searchData.results : [],
-      meta: searchData.meta || {}
     };
 
     updateStep(`Found ${usptoData.totalFound} marks — running AI DuPont analysis...`);
 
-    // ✅ NEW BACKEND CONTRACT:
-    // POST /api/analyze body: { markName, results }
     const analysisRes = await fetch(`${API_BASE}/api/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        markName: mark,
-        results: usptoData.results
-      })
+      body: JSON.stringify({ markName: mark, classCode, results: usptoData.results })
     });
 
-    if (!analysisRes.ok) {
-      const txt = await analysisRes.text().catch(() => '');
-      throw new Error(`Analysis failed (${analysisRes.status})${txt ? ': ' + txt : ''}`);
-    }
-
+    if (!analysisRes.ok) throw new Error(`Analysis failed (${analysisRes.status})`);
     const analysis = await analysisRes.json();
 
-    updateStep('Building report...');
     renderResults(mark, classCode, usptoData, analysis);
-
   } catch (err) {
     container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
   }
@@ -695,18 +234,14 @@ async function runScan() {
 
 function renderResults(mark, classCode, usptoData, analysis) {
   const container = document.getElementById('resultsContainer');
-
   const score = Number(analysis.approvalScore || 0);
   const scoreClass = score >= 70 ? 'score-green' : score >= 40 ? 'score-yellow' : 'score-red';
   const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
-
   const conflicts = Array.isArray(analysis.conflictAnalysis) ? analysis.conflictAnalysis : [];
 
-  // Claude schema -> UI schema normalization
   const normalizedConflicts = conflicts.map(c => {
     const status = String(c.status || '').toUpperCase();
     const isLive = status.includes('LIVE') || status === 'LIVE';
-
     return {
       serialNumber: c.serialNumber || null,
       mark: c.markName || null,
@@ -724,24 +259,20 @@ function renderResults(mark, classCode, usptoData, analysis) {
     ? normalizedConflicts.map(c => {
         const risk = c.riskLevel || 'MEDIUM';
         const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
-
-        return `
-          <div class="conflict-item">
-            <div>
-              <div class="conflict-mark">${c.mark || 'N/A'}</div>
-              <div class="conflict-goods">${c.goods ? c.goods.substring(0,120) + (c.goods.length > 120 ? '...' : '') : 'No goods description'}</div>
-            </div>
-            <div>
-              <div class="conflict-serial">${c.serialNumber || ''}</div>
-              <div style="margin-top:0.3rem">
-                <span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span>
-              </div>
-            </div>
-            <div style="text-align:right">
-              <span class="risk-tag ${riskClass}">${risk} RISK</span>
-              ${c.reason ? `<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>` : ''}
-            </div>
-          </div>`;
+        return `<div class="conflict-item">
+          <div>
+            <div class="conflict-mark">${c.mark || 'N/A'}</div>
+            <div class="conflict-goods">${c.goods ? c.goods.substring(0,120) + (c.goods.length > 120 ? '...' : '') : 'No goods description'}</div>
+          </div>
+          <div>
+            <div class="conflict-serial">${c.serialNumber || ''}</div>
+            <div style="margin-top:0.3rem"><span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span></div>
+          </div>
+          <div style="text-align:right">
+            <span class="risk-tag ${riskClass}">${risk} RISK</span>
+            ${c.reason ? `<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>` : ''}
+          </div>
+        </div>`;
       }).join('')
     : '<div class="no-conflicts">✓ NO CONFLICTING MARKS IDENTIFIED</div>';
 
@@ -753,66 +284,39 @@ function renderResults(mark, classCode, usptoData, analysis) {
     ? `<span class="source-tag source-live">● LIVE SEARCH</span>`
     : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
 
-  container.innerHTML = `
-    <div class="verdict-card">
-      <div class="verdict-header">
-        <div>
-          <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
-          <div class="verdict-mark">${mark}</div>
-          <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">
-            ${analysis.distinctiveness || ''}
-          </div>
-        </div>
-        <div class="score-display">
-          <span class="score-number ${scoreClass}">${score}</span>
-          <span class="score-label">Approval Likelihood</span>
-          <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict || ''}</div>
-        </div>
+  const classLabel = classCode ? ` · Class ${classCode}` : '';
+
+  container.innerHTML = `<div class="verdict-card">
+    <div class="verdict-header">
+      <div>
+        <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
+        <div class="verdict-mark">${mark}</div>
+        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">${analysis.distinctiveness || ''}${classLabel}</div>
       </div>
-
-      <div class="verdict-bar">
-        <div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div>
+      <div class="score-display">
+        <span class="score-number ${scoreClass}">${score}</span>
+        <span class="score-label">Approval Likelihood</span>
+        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict || ''}</div>
       </div>
+    </div>
+    <div class="verdict-bar"><div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div></div>
+    <div class="stats-row">
+      <div class="stat-box"><span class="stat-num">${usptoData.totalFound || 0}</span><span class="stat-lbl">Records Reviewed</span></div>
+      <div class="stat-box"><span class="stat-num" style="color:var(--red)">${liveConflicts}</span><span class="stat-lbl">Live Conflicts</span></div>
+      <div class="stat-box"><span class="stat-num" style="color:var(--muted)">${deadConflicts}</span><span class="stat-lbl">Dead Marks</span></div>
+      <div class="stat-box"><span class="stat-num" style="color:${barColor}">${score}%</span><span class="stat-lbl">Approval Score</span></div>
+    </div>
+    <div class="section-label">AI Recommendation</div>
+    <div class="verdict-analysis">${analysis.recommendation || 'No recommendation generated.'}</div>
+    ${risksHTML ? `<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}` : ''}
+    <div class="section-label" style="margin-top:2rem">Conflict Analysis (${normalizedConflicts.length} marks reviewed)</div>
+    ${conflictsHTML}
+  </div>`;
 
-      <div class="stats-row">
-        <div class="stat-box">
-          <span class="stat-num">${usptoData.totalFound || 0}</span>
-          <span class="stat-lbl">Records Reviewed</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-num" style="color:var(--red)">${liveConflicts}</span>
-          <span class="stat-lbl">Live Conflicts</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-num" style="color:var(--muted)">${deadConflicts}</span>
-          <span class="stat-lbl">Dead Marks</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-num" style="color:${barColor}">${score}%</span>
-          <span class="stat-lbl">Approval Score</span>
-        </div>
-      </div>
-
-      <div class="section-label">AI Recommendation</div>
-      <div class="verdict-analysis">${analysis.recommendation || 'No recommendation generated.'}</div>
-
-      ${risksHTML ? `<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}` : ''}
-
-      <div class="section-label" style="margin-top:2rem">Conflict Analysis (${normalizedConflicts.length} marks reviewed)</div>
-      ${conflictsHTML}
-    </div>`;
-
-  setTimeout(() => {
-    const bar = document.getElementById('barFill');
-    if (bar) bar.style.width = score + '%';
-  }, 100);
+  setTimeout(() => { const bar = document.getElementById('barFill'); if (bar) bar.style.width = score + '%'; }, 100);
 }
 
-// Enter key triggers scan
-document.getElementById('markInput').addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') runScan();
-});
-  
-</script>  
+document.getElementById('markInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') runScan(); });
+</script>
 </body>
 </html>
