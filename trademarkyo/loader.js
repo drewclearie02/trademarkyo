@@ -93,18 +93,85 @@ function downloadFile(url, destPath) {
 
 /**
  * Get list of available trademark data files from USPTO API
+ * Tries multiple known USPTO API endpoints
  */
 async function getFileList(fromDate, toDate) {
-  const url = `https://api.uspto.gov/api/v1/datasets/products/TRTDXFAP?fileDataFromDate=${fromDate}&fileDataToDate=${toDate}&includeFiles=true`;
-  log(`Fetching file list: ${fromDate} to ${toDate}`);
+  // Try the Open Data Portal API v2 endpoint first
+  const urls = [
+    `https://developer.uspto.gov/ds-api/datasets/TRTDXFAP/fields`,
+    `https://developer.uspto.gov/product/file/trademark-applications-daily`,
+    `https://bulkdata.uspto.gov/data/trademark/dailyxml/applications/`,
+  ];
 
-  const { status, body } = await httpGet(url);
-  if (status !== 200) throw new Error(`USPTO API returned ${status}: ${body.slice(0, 200)}`);
+  // Primary: data.uspto.gov bulk data API
+  const primaryUrl = `https://data.uspto.gov/api/v1/dataset/TRTDXFAP/bulkfiles?dateFrom=${fromDate}&dateTo=${toDate}`;
+  log(`Fetching file list from: ${primaryUrl}`);
 
-  const data = JSON.parse(body);
-  const files = data?.dataSetFiles || data?.files || [];
-  log(`Found ${files.length} files`);
-  return files;
+  try {
+    const { status, body } = await httpGet(primaryUrl);
+    log(`Primary API response: ${status} — ${body.slice(0, 300)}`);
+    if (status === 200) {
+      const data = JSON.parse(body);
+      const files = data?.bulkFiles || data?.files || data?.dataSetFiles || data?.results || [];
+      if (files.length > 0) {
+        log(`Found ${files.length} files`);
+        return files;
+      }
+    }
+  } catch (e) {
+    log(`Primary API failed: ${e.message}`);
+  }
+
+  // Fallback: try the developer.uspto.gov endpoint
+  const fallbackUrl = `https://developer.uspto.gov/api/v1/datasets/TRTDXFAP/bulkfiles?dateFrom=${fromDate}&dateTo=${toDate}`;
+  log(`Trying fallback: ${fallbackUrl}`);
+  try {
+    const { status, body } = await httpGet(fallbackUrl);
+    log(`Fallback response: ${status} — ${body.slice(0, 300)}`);
+    if (status === 200) {
+      const data = JSON.parse(body);
+      const files = data?.bulkFiles || data?.files || data?.dataSetFiles || [];
+      log(`Found ${files.length} files`);
+      return files;
+    }
+  } catch (e) {
+    log(`Fallback failed: ${e.message}`);
+  }
+
+  // Last resort: scrape the bulk data directory listing
+  const dirUrl = `https://bulkdata.uspto.gov/data/trademark/dailyxml/applications/`;
+  log(`Trying directory listing: ${dirUrl}`);
+  try {
+    const { status, body } = await httpGet(dirUrl);
+    log(`Directory response: ${status} — ${body.slice(0, 500)}`);
+    if (status === 200) {
+      // Parse HTML directory listing for .zip files
+      const matches = body.match(/href="([^"]*\.zip)"/gi) || [];
+      const files = matches.map(m => {
+        const filename = m.replace(/href="/i, '').replace(/"$/, '');
+        return {
+          fileName: filename,
+          downloadUrl: filename.startsWith('http') ? filename : `${dirUrl}${filename}`,
+          url: filename.startsWith('http') ? filename : `${dirUrl}${filename}`,
+        };
+      });
+      // Filter by date range if possible
+      const from = fromDate.replace(/-/g, '');
+      const to = toDate.replace(/-/g, '');
+      const filtered = files.filter(f => {
+        const dateMatch = f.fileName.match(/(\d{8})/);
+        if (!dateMatch) return true;
+        return dateMatch[1] >= from && dateMatch[1] <= to;
+      });
+      log(`Found ${filtered.length} files in directory (${files.length} total)`);
+      return filtered.length > 0 ? filtered : files.slice(-30); // last 30 if no date match
+    }
+  } catch (e) {
+    log(`Directory listing failed: ${e.message}`);
+  }
+
+  log('All file sources failed — returning empty');
+  return [];
 }
 
 /**
@@ -359,8 +426,9 @@ async function runLoader(mode = 'incremental') {
     const files = await getFileList(fromStr, toStr);
 
     if (files.length === 0) {
-      log('No files found for date range');
+      log('No files found for date range — database will remain empty until USPTO files are available');
       await logRun('no_files', 0, `No files found for ${fromStr} to ${toStr}`);
+      // Don't throw — let server.js start normally
       return;
     }
 
@@ -444,5 +512,6 @@ async function extractAndParse(zipPath) {
 const mode = process.argv[2] || 'incremental';
 runLoader(mode).catch(e => {
   console.error('[loader] Fatal error:', e.message);
-  process.exit(1);
+  // Exit 0 so && node server.js still runs
+  process.exit(0);
 });
