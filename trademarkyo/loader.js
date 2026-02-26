@@ -123,11 +123,11 @@ async function getFileList(mode) {
       else if (Array.isArray(data?.results)) files = data.results;
       else if (Array.isArray(data)) files = data;
 
-      // Dig into bulkDataProductBag if present
+      // Correct USPTO structure: bulkDataProductBag[0].productFileBag.fileDataBag
       if (!files.length && data?.bulkDataProductBag) {
         const bag = Array.isArray(data.bulkDataProductBag) ? data.bulkDataProductBag : [data.bulkDataProductBag];
         for (const product of bag) {
-          const pf = product?.productFileArray?.productFile || product?.productFiles || product?.files || [];
+          const pf = product?.productFileBag?.fileDataBag || [];
           files.push(...(Array.isArray(pf) ? pf : [pf]));
         }
       }
@@ -138,7 +138,7 @@ async function getFileList(mode) {
       if (files.length > 0) {
         const result = files.map(f => ({
           fileName: f.fileName || f.name || f.fileTitle || f.title || f.productFileName || f.productFileTitle || '',
-          downloadUrl: f.fileDownloadUrl || f.downloadUrl || f.url || f.href || f.fileUrl || f.productFileUrl || f.productFileDownloadUrl || '',
+          downloadUrl: f.fileDownloadURI || f.fileDownloadUrl || f.downloadUrl || f.url || '',
         })).filter(f => f.downloadUrl);
         log(`Files with download URLs: ${result.length}`);
         return result;
@@ -166,11 +166,11 @@ async function getFileList(mode) {
       let files = data?.productFiles || data?.files || data?.bulkFiles || data?.results || [];
       if (!Array.isArray(files)) files = [];
 
-      // Check bulkDataProductBag — actual USPTO API response structure
+      // Correct USPTO structure: bulkDataProductBag[0].productFileBag.fileDataBag
       if (!files.length && data?.bulkDataProductBag) {
         const bag = Array.isArray(data.bulkDataProductBag) ? data.bulkDataProductBag : [data.bulkDataProductBag];
         for (const product of bag) {
-          const pf = product?.productFileArray?.productFile || product?.productFiles || product?.files || [];
+          const pf = product?.productFileBag?.fileDataBag || [];
           files.push(...(Array.isArray(pf) ? pf : [pf]));
         }
       }
@@ -183,7 +183,7 @@ async function getFileList(mode) {
       if (files.length > 0) {
         return files.map(f => ({
           fileName: f.fileName || f.name || '',
-          downloadUrl: f.fileDownloadUrl || f.downloadUrl || f.url || f.productFileUrl || f.productFileDownloadUrl || '',
+          downloadUrl: f.fileDownloadURI || f.fileDownloadUrl || f.downloadUrl || f.url || '',
         })).filter(f => f.downloadUrl);
       }
     }
