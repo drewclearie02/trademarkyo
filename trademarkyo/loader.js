@@ -1,28 +1,22 @@
 'use strict';
 
-/**
- * USPTO Trademark Bulk Data Loader
- * Uses the confirmed API endpoint from USPTO Open Data Portal
- */
-
 const https    = require('https');
 const http     = require('http');
 const fs       = require('fs');
 const path     = require('path');
-const { parseStringPromise } = require('xml2js');
+const sax      = require('sax');
 const unzipper = require('unzipper');
 const { Pool } = require('pg');
 
 const USPTO_API_KEY = process.env.USPTO_API_KEY || '';
 const DATABASE_URL  = process.env.DATABASE_URL  || '';
 const TMP_DIR = '/tmp/tyo_loader';
-
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
   ssl: DATABASE_URL.includes('railway.internal') ? false : { rejectUnauthorized: false },
-  max: 5,
+  max: 3,
 });
 
 function log(msg) { console.log(`[loader] ${new Date().toISOString()} — ${msg}`); }
@@ -31,23 +25,15 @@ function log(msg) { console.log(`[loader] ${new Date().toISOString()} — ${msg}
 
 function httpGetJson(url, apiKey) {
   return new Promise((resolve, reject) => {
-    const headers = {
-      'User-Agent': 'trademarkyo/1.0',
-      'Accept': 'application/json',
-    };
+    const headers = { 'User-Agent': 'trademarkyo/1.0', 'Accept': 'application/json' };
     if (apiKey) headers['x-api-key'] = apiKey;
-
     const mod = url.startsWith('https') ? https : http;
     const req = mod.get(url, { headers }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location)
         return httpGetJson(res.headers.location, apiKey).then(resolve).catch(reject);
-      }
       const chunks = [];
       res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        const body = Buffer.concat(chunks).toString('utf8');
-        resolve({ status: res.statusCode, body });
-      });
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
       res.on('error', reject);
     });
     req.setTimeout(30000, () => { req.destroy(); reject(new Error('Timeout')); });
@@ -59,249 +45,159 @@ function downloadFile(url, dest, apiKey) {
   return new Promise((resolve, reject) => {
     const headers = { 'User-Agent': 'trademarkyo/1.0' };
     if (apiKey) headers['x-api-key'] = apiKey;
-
     const mod = url.startsWith('https') ? https : http;
     const req = mod.get(url, { headers }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location)
         return downloadFile(res.headers.location, dest, apiKey).then(resolve).catch(reject);
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
-      }
+      if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
       const file = fs.createWriteStream(dest);
       res.pipe(file);
       file.on('finish', () => file.close(() => resolve(dest)));
       file.on('error', reject);
     });
-    req.setTimeout(600000, () => { req.destroy(); reject(new Error('Download timeout')); });
+    req.setTimeout(300000, () => { req.destroy(); reject(new Error('Download timeout')); });
     req.on('error', reject);
   });
 }
 
-// ── File discovery ─────────────────────────────────────────────────────────────
+// ── File list ─────────────────────────────────────────────────────────────────
 
 function getDateRange(mode) {
   const today = new Date();
   const to = today.toISOString().split('T')[0];
-  let from;
-  if (mode === 'full') {
-    const d = new Date(today);
-    d.setDate(d.getDate() - 30);
-    from = d.toISOString().split('T')[0];
-  } else if (mode === 'daily') {
-    const d = new Date(today);
-    d.setDate(d.getDate() - 2); // go back 2 days to catch yesterday reliably
-    from = d.toISOString().split('T')[0];
-  } else {
-    const d = new Date(today);
-    d.setDate(d.getDate() - 14);
-    from = d.toISOString().split('T')[0];
-  }
-  return { from, to };
+  const d = new Date(today);
+  if (mode === 'daily') d.setDate(d.getDate() - 2);
+  else d.setDate(d.getDate() - 30);
+  return { from: d.toISOString().split('T')[0], to };
 }
 
 async function getFileList(mode) {
   const { from, to } = getDateRange(mode);
   log(`Fetching file list: ${from} to ${to}`);
-
-  // Primary: confirmed working UI API endpoint
-  const url = `https://data.uspto.gov/ui/datasets/products/trtdxfap?includeFiles=true&fileDataFromDate=${from}&fileDataToDate=${to}`;
-  log(`Trying: ${url}`);
-
-  try {
-    const { status, body } = await httpGetJson(url, USPTO_API_KEY);
-    log(`Response: ${status}, length: ${body.length}`);
-
-    if (status === 200 && body.length > 10) {
-      const data = JSON.parse(body);
-
-      // Extract files from response — try multiple known shapes
-      let files = [];
-      if (Array.isArray(data?.productFiles)) files = data.productFiles;
-      else if (Array.isArray(data?.files)) files = data.files;
-      else if (Array.isArray(data?.bulkFiles)) files = data.bulkFiles;
-      else if (Array.isArray(data?.results)) files = data.results;
-      else if (Array.isArray(data)) files = data;
-
-      // Correct USPTO structure: bulkDataProductBag[0].productFileBag.fileDataBag
-      if (!files.length && data?.bulkDataProductBag) {
-        const bag = Array.isArray(data.bulkDataProductBag) ? data.bulkDataProductBag : [data.bulkDataProductBag];
-        for (const product of bag) {
-          const pf = product?.productFileBag?.fileDataBag || [];
-          files.push(...(Array.isArray(pf) ? pf : [pf]));
-        }
-      }
-
-      log(`Raw response keys: ${Object.keys(data || {}).join(', ')}`);
-      log(`Files found: ${files.length}`);
-
-      if (files.length > 0) {
-        const result = files.map(f => ({
-          fileName: f.fileName || f.name || f.fileTitle || f.title || f.productFileName || f.productFileTitle || '',
-          downloadUrl: f.fileDownloadURI || f.fileDownloadUrl || f.downloadUrl || f.url || '',
-        })).filter(f => f.downloadUrl);
-        log(`Files with download URLs: ${result.length}`);
-        return result;
-      }
-
-      // Log the full response structure so we can debug further if still empty
-      log(`Full response sample: ${body.slice(0, 500)}`);
-    } else {
-      log(`Bad response: ${status} — ${body.slice(0, 200)}`);
+  const url = `https://api.uspto.gov/api/v1/datasets/products/trtdxfap?fileDataFromDate=${from}&fileDataToDate=${to}&includeFiles=true`;
+  const { status, body } = await httpGetJson(url, USPTO_API_KEY);
+  if (status !== 200) throw new Error(`API returned ${status}`);
+  const data = JSON.parse(body);
+  const files = [];
+  for (const product of (data?.bulkDataProductBag || [])) {
+    for (const f of (product?.productFileBag?.fileDataBag || [])) {
+      if (f.fileDownloadURI) files.push({ fileName: f.fileName, downloadUrl: f.fileDownloadURI });
     }
-  } catch (e) {
-    log(`Primary API error: ${e.message}`);
   }
+  log(`Found ${files.length} files`);
+  return files;
+}
 
-  // Fallback: official API endpoint from the "API Query" button on the ODP page
-  const apiUrl = `https://api.uspto.gov/api/v1/datasets/products/trtdxfap?fileDataFromDate=${from}&fileDataToDate=${to}&includeFiles=true`;
-  log(`Trying official API: ${apiUrl}`);
+// ── SAX streaming XML parser ──────────────────────────────────────────────────
+// Processes one <case-file> at a time without loading full XML into memory
 
-  try {
-    const { status, body } = await httpGetJson(apiUrl, USPTO_API_KEY);
-    log(`Official API response: ${status}, length: ${body.length}`);
+function parseXmlStream(xmlStream) {
+  return new Promise((resolve, reject) => {
+    const records = [];
+    const parser = sax.createStream(false, { lowercase: true, trim: true });
 
-    if (status === 200 && body.length > 10) {
-      const data = JSON.parse(body);
-      let files = data?.productFiles || data?.files || data?.bulkFiles || data?.results || [];
-      if (!Array.isArray(files)) files = [];
+    let inCaseFile = false;
+    let currentTag = '';
+    let current = {};
+    let tagStack = [];
+    const DEAD_CODES = new Set(['600','601','602','603','604','700','710','800','810','820','900']);
 
-      // Correct USPTO structure: bulkDataProductBag[0].productFileBag.fileDataBag
-      if (!files.length && data?.bulkDataProductBag) {
-        const bag = Array.isArray(data.bulkDataProductBag) ? data.bulkDataProductBag : [data.bulkDataProductBag];
-        for (const product of bag) {
-          const pf = product?.productFileBag?.fileDataBag || [];
-          files.push(...(Array.isArray(pf) ? pf : [pf]));
-        }
+    parser.on('opentag', (node) => {
+      tagStack.push(node.name);
+      currentTag = node.name;
+      if (node.name === 'case-file') {
+        inCaseFile = true;
+        current = {};
       }
-
-      log(`Official API files: ${files.length}`);
-      if (files.length > 0) log(`First file keys: ${Object.keys(files[0]).join(', ')}`);
-      if (files.length > 0) log(`First file: ${JSON.stringify(files[0]).slice(0, 300)}`);
-      log(`Official API sample: ${body.slice(0, 300)}`);
-
-      if (files.length > 0) {
-        return files.map(f => ({
-          fileName: f.fileName || f.name || '',
-          downloadUrl: f.fileDownloadURI || f.fileDownloadUrl || f.downloadUrl || f.url || '',
-        })).filter(f => f.downloadUrl);
-      }
-    }
-  } catch (e) {
-    log(`Official API error: ${e.message}`);
-  }
-
-  log('No files found from any source');
-  return [];
-}
-
-// ── XML Parsing ────────────────────────────────────────────────────────────────
-
-function extractText(node) {
-  if (!node) return '';
-  if (typeof node === 'string') return node.trim();
-  if (Array.isArray(node)) return extractText(node[0]);
-  if (typeof node === 'object' && node._) return String(node._).trim();
-  return String(node).trim();
-}
-
-function extractRecord(cf) {
-  try {
-    const sn = extractText(
-      cf['serial-number'] || cf.serialNumber || cf['application-serial-number']
-    );
-    if (!sn || sn.length < 5) return null;
-
-    const header = cf['case-file-header'] || cf.header || {};
-    const markName = extractText(
-      header['mark-identification'] || cf['mark-identification'] ||
-      cf['word-mark'] || header['mark-text']
-    ).toUpperCase();
-    if (!markName) return null;
-
-    const statusCode = extractText(header['status-code'] || header['filing-status'] || '');
-    const deadCodes = ['600','601','602','603','604','700','710','800'];
-    const isLive = !deadCodes.some(c => statusCode.includes(c));
-
-    let owner = '';
-    try {
-      const owners = cf['case-file-owners']?.['case-file-owner'] || [];
-      const arr = Array.isArray(owners) ? owners : [owners];
-      owner = extractText(arr[0]?.['party-name'] || arr[0]?.['entity-name'] || '').slice(0, 255);
-    } catch {}
-
-    let goodsServices = '';
-    try {
-      const stmts = cf['case-file-statements']?.['case-file-statement'] || [];
-      const arr = Array.isArray(stmts) ? stmts : [stmts];
-      goodsServices = arr.map(s => extractText(s?.text || '')).filter(Boolean).join('; ').slice(0, 2000);
-    } catch {}
-
-    let intClass = '';
-    try {
-      const cls = cf?.classifications?.classification || [];
-      const arr = Array.isArray(cls) ? cls : [cls];
-      intClass = arr.map(c => extractText(c?.['international-code'] || '')).filter(Boolean).join(',').slice(0, 50);
-    } catch {}
-
-    return {
-      serial_number: sn.replace(/\D/g, '').slice(0, 20),
-      mark_name: markName.slice(0, 500),
-      owner: owner || null,
-      status: isLive ? 'LIVE' : 'DEAD',
-      goods_services: goodsServices || null,
-      int_class: intClass || null,
-      filing_date: extractText(header['filing-date'] || '').replace(/\D/g, '').slice(0, 20) || null,
-      reg_date: extractText(header['registration-date'] || '').replace(/\D/g, '').slice(0, 20) || null,
-    };
-  } catch { return null; }
-}
-
-function findCaseFiles(obj, depth = 0) {
-  if (depth > 4 || !obj || typeof obj !== 'object') return [];
-  for (const [key, val] of Object.entries(obj)) {
-    if (key === 'case-file') return Array.isArray(val) ? val : [val];
-    const found = findCaseFiles(val, depth + 1);
-    if (found.length) return found;
-  }
-  return [];
-}
-
-async function parseXml(content) {
-  const records = [];
-  try {
-    const parsed = await parseStringPromise(content, {
-      explicitArray: false, mergeAttrs: false, trim: true,
     });
-    const caseFiles = findCaseFiles(parsed);
-    for (const cf of caseFiles) {
-      const rec = extractRecord(cf);
-      if (rec) records.push(rec);
-    }
-  } catch (e) {
-    log(`XML parse error: ${e.message}`);
-  }
-  return records;
+
+    parser.on('text', (text) => {
+      if (!inCaseFile || !text.trim()) return;
+      const t = text.trim();
+      switch (currentTag) {
+        case 'serial-number':       if (!current.serial_number) current.serial_number = t; break;
+        case 'mark-identification': if (!current.mark_name) current.mark_name = t.toUpperCase(); break;
+        case 'status-code':         if (!current.status_code) current.status_code = t; break;
+        case 'filing-date':         if (!current.filing_date) current.filing_date = t; break;
+        case 'registration-date':   if (!current.reg_date) current.reg_date = t; break;
+        case 'party-name':          if (!current.owner) current.owner = t.slice(0, 255); break;
+        case 'entity-name':         if (!current.owner) current.owner = t.slice(0, 255); break;
+        case 'international-code':
+          current.int_class = current.int_class ? current.int_class + ',' + t : t;
+          break;
+        case 'text':
+          // only capture under case-file-statement context
+          if (tagStack.includes('case-file-statement')) {
+            current.goods_services = current.goods_services
+              ? current.goods_services + '; ' + t
+              : t;
+          }
+          break;
+      }
+    });
+
+    parser.on('closetag', (name) => {
+      tagStack.pop();
+      currentTag = tagStack[tagStack.length - 1] || '';
+
+      if (name === 'case-file' && inCaseFile) {
+        inCaseFile = false;
+        if (current.serial_number && current.mark_name) {
+          const dead = DEAD_CODES.has((current.status_code || '').slice(0, 3));
+          records.push({
+            serial_number: current.serial_number.replace(/\D/g, '').slice(0, 20),
+            mark_name:     current.mark_name.slice(0, 500),
+            owner:         current.owner || null,
+            status:        dead ? 'DEAD' : 'LIVE',
+            goods_services: current.goods_services ? current.goods_services.slice(0, 2000) : null,
+            int_class:     current.int_class ? current.int_class.slice(0, 50) : null,
+            filing_date:   current.filing_date || null,
+            reg_date:      current.reg_date || null,
+          });
+        }
+        current = {};
+      }
+    });
+
+    parser.on('error', (e) => {
+      // SAX errors on malformed XML — just log and continue
+      log(`SAX warning: ${e.message}`);
+      parser._parser.error = null;
+      parser._parser.resume();
+    });
+
+    parser.on('end', () => resolve(records));
+
+    xmlStream.pipe(parser);
+  });
 }
+
+// ── Process a ZIP file ────────────────────────────────────────────────────────
 
 async function processZip(zipPath) {
-  const records = [];
+  let total = 0;
   const dir = await unzipper.Open.file(zipPath);
+
   for (const entry of dir.files) {
     if (entry.type === 'Directory' || !entry.path.toLowerCase().endsWith('.xml')) continue;
+    log(`  Parsing ${entry.path}...`);
     try {
-      const buf = await entry.buffer();
-      const parsed = await parseXml(buf.toString('utf8'));
-      records.push(...parsed);
-      log(`  ${entry.path}: ${parsed.length} records`);
+      const xmlStream = entry.stream();
+      const records = await parseXmlStream(xmlStream);
+      log(`  ${entry.path}: ${records.length} records`);
+      if (records.length > 0) {
+        const n = await upsertRecords(records);
+        total += n;
+        log(`  Upserted ${n} — running total: ${total}`);
+      }
     } catch (e) {
       log(`  Failed ${entry.path}: ${e.message}`);
     }
   }
-  return records;
+  return total;
 }
 
-// ── DB upsert ──────────────────────────────────────────────────────────────────
+// ── DB ────────────────────────────────────────────────────────────────────────
 
 async function ensureSchema() {
   await pool.query(`
@@ -336,7 +232,7 @@ async function upsertRecords(records) {
       }).join(',');
       const params = batch.flatMap(r => [
         r.serial_number, r.mark_name, r.owner, r.status,
-        r.goods_services, r.int_class, r.filing_date, r.reg_date
+        r.goods_services, r.int_class, r.filing_date, r.reg_date,
       ]);
       await client.query(`
         INSERT INTO trademarks
@@ -360,24 +256,16 @@ async function upsertRecords(records) {
 async function run(mode) {
   log(`Starting — mode: ${mode}`);
   let total = 0;
-
   try {
     await ensureSchema();
-
     const files = await getFileList(mode);
-
     if (!files.length) {
-      log('No files found');
-      await pool.query(
-        `INSERT INTO loader_log (status,records_processed,message) VALUES ('no_files',0,'No files available')`
-      );
+      await pool.query(`INSERT INTO loader_log (status,records_processed,message) VALUES ('no_files',0,'No files found')`);
       return;
     }
-
-    log(`Processing ${files.length} file(s)...`);
-    // Cap at 30 files per run to avoid memory exhaustion on Railway's 512MB container
+    // Cap at 30 files per run
     const batch = files.slice(0, 30);
-    if (files.length > 30) log(`Capping at 30 files (found ${files.length})`);
+    log(`Processing ${batch.length} files...`);
 
     for (const { fileName, downloadUrl } of batch) {
       const tmpPath = path.join(TMP_DIR, fileName || `dl_${Date.now()}.zip`);
@@ -385,18 +273,12 @@ async function run(mode) {
         log(`Downloading: ${fileName}`);
         await downloadFile(downloadUrl, tmpPath, USPTO_API_KEY);
         const mb = (fs.statSync(tmpPath).size / 1024 / 1024).toFixed(1);
-        log(`Downloaded: ${fileName} (${mb} MB)`);
-
-        const records = await processZip(tmpPath);
-        log(`Parsed: ${records.length} records`);
-
-        if (records.length > 0) {
-          const n = await upsertRecords(records);
-          total += n;
-          log(`Upserted: ${n} — total: ${total}`);
-        }
+        log(`Downloaded: ${fileName} (${mb} MB) — parsing...`);
+        const n = await processZip(tmpPath);
+        total += n;
+        log(`Done ${fileName}: ${n} records — total: ${total}`);
       } catch (e) {
-        log(`Failed on ${fileName}: ${e.message}`);
+        log(`Failed ${fileName}: ${e.message}`);
       } finally {
         try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch {}
       }
@@ -404,17 +286,13 @@ async function run(mode) {
 
     await pool.query(
       `INSERT INTO loader_log (status,records_processed,message) VALUES ('success',$1,$2)`,
-      [total, `Loaded ${total} records (${mode} mode)`]
+      [total, `Loaded ${total} records (${mode})`]
     );
     log(`Done — ${total} total records`);
-
   } catch (e) {
     log(`Fatal: ${e.message}`);
     try {
-      await pool.query(
-        `INSERT INTO loader_log (status,records_processed,message) VALUES ('error',0,$1)`,
-        [e.message]
-      );
+      await pool.query(`INSERT INTO loader_log (status,records_processed,message) VALUES ('error',0,$1)`, [e.message]);
     } catch {}
   } finally {
     await pool.end();
