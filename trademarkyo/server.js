@@ -203,14 +203,40 @@ app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.h
 // ─── STARTUP ────────────────────────────────────────────────────────────────
 
 async function start() {
+  // Start server FIRST — never block on DB or loader
+  app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
+
+  // Init schema
   try {
     await initSchema();
     console.log('[startup] Database schema initialized');
   } catch (e) {
     console.error('[startup] DB init failed:', e.message);
   }
+
+  // Start daily cron
   startCron();
-  app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
+
+  // If DB is empty, kick off initial load in background without blocking
+  try {
+    const count = await getTrademarkCount();
+    if (count === 0) {
+      console.log('[startup] Database empty — launching background loader...');
+      const { spawn } = require('child_process');
+      const child = spawn('node', ['loader.js', 'full'], {
+        detached: true,
+        stdio: 'inherit',
+        cwd: __dirname,
+        env: { ...process.env },
+      });
+      child.unref();
+      console.log(`[startup] Loader running in background (PID: ${child.pid})`);
+    } else {
+      console.log(`[startup] Database has ${count} records — ready`);
+    }
+  } catch (e) {
+    console.error('[startup] Background loader error:', e.message);
+  }
 }
 
 start();
