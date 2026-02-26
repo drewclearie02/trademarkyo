@@ -5,17 +5,17 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "load": "node loader.js incremental",
+    "load": "node loader.js daily",
     "load:full": "node loader.js full",
     "load:daily": "node loader.js daily"
   },
   "dependencies": {
-    "adm-zip": "^0.5.10",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "node-cron": "^3.0.3",
     "pg": "^8.11.3",
-    "xml2js": "^0.6.2"
+    "sax": "^1.4.1",
+    "unzipper": "^0.10.14"
   },
   "engines": {
     "node": ">=18"
