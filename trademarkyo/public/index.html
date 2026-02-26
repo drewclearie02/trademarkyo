@@ -35,19 +35,20 @@
   input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 1.4rem; font-weight: 600; padding: 1rem 1.25rem; outline: none; transition: border-color 0.2s; letter-spacing: 0.05em; }
   input[type="text"]:focus { border-color: var(--accent); }
   input[type="text"]::placeholder { color: var(--muted); font-weight: 300; font-size: 1.2rem; }
+  /* CHANGE 3: disabled styles for input lock */
   input[type="text"]:disabled,
   select:disabled { opacity: 0.45; cursor: not-allowed; }
   input[type="text"]:disabled { border-color: var(--border) !important; }
   .class-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.75rem; padding: 1rem; outline: none; cursor: pointer; min-width: 260px; }
   .class-select:focus { border-color: var(--accent); }
   .class-select optgroup { color: var(--muted); font-size: 0.65rem; }
-  .btn-scan { flex: 1; background: var(--accent); color: #000; border: none; font-family: 'Bebas Neue', cursive; font-size: 1.4rem; letter-spacing: 0.1em; padding: 1.1rem; cursor: pointer; transition: all 0.15s; }
+  .btn-scan { width: 100%; background: var(--accent); color: #000; border: none; font-family: 'Bebas Neue', cursive; font-size: 1.4rem; letter-spacing: 0.1em; padding: 1.1rem; cursor: pointer; transition: all 0.15s; }
   .btn-scan:hover { background: #fff; }
   .btn-scan:active { transform: scale(0.99); }
   .btn-scan:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
-  .btn-new-search { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 1.1rem 1.4rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; display: none; }
+  /* CHANGE 3: new search button */
+  .btn-new-search { width: 100%; background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.75rem; cursor: pointer; transition: all 0.15s; margin-top: 0.5rem; display: none; }
   .btn-new-search:hover { border-color: var(--accent); color: var(--accent); }
-  .scan-row { display: flex; gap: 0.75rem; }
   .results-container { max-width: 900px; margin: 0 auto; padding: 0 3rem 5rem; }
   .verdict-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.4s ease forwards; }
   @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -78,7 +79,6 @@
   .status-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; padding: 0.2rem 0.5rem; text-transform: uppercase; }
   .live { background: rgba(71,255,138,0.1); color: var(--green); }
   .dead { background: rgba(102,102,102,0.2); color: var(--muted); }
-  .variation-tag { font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.1em; padding: 0.15rem 0.45rem; text-transform: uppercase; background: rgba(232,255,71,0.1); color: var(--accent); margin-left: 0.4rem; vertical-align: middle; }
   .loading-state { padding: 4rem 0; text-align: center; }
   .loading-spinner { width: 2rem; height: 2rem; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -120,6 +120,7 @@
   .modal-divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
   .modal-analysis { background: var(--bg); border-left: 3px solid var(--accent); padding: 1rem 1.25rem; font-size: 0.85rem; line-height: 1.6; color: var(--text); font-weight: 300; }
   .click-hint { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); text-align: right; margin-bottom: 0.5rem; letter-spacing: 0.1em; }
+  /* NAME SUGGESTIONS */
   .suggestions-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.5s ease forwards; position: relative; overflow: hidden; }
   .suggestions-card::before { content: ''; position: absolute; top: -1px; left: 0; width: 4rem; height: 3px; background: var(--accent); }
   .suggestions-card::after { content: 'AI'; position: absolute; top: 1.5rem; right: 2rem; font-family: 'Bebas Neue', cursive; font-size: 5rem; color: rgba(232,255,71,0.04); letter-spacing: 0.1em; pointer-events: none; }
@@ -136,6 +137,7 @@
   .btn-resuggest { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.6rem 1.2rem; cursor: pointer; transition: all 0.15s; margin-top: 0.5rem; white-space: nowrap; }
   .btn-resuggest:hover { border-color: var(--accent); color: var(--accent); }
   .try-name-hint { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); margin-top: 1rem; letter-spacing: 0.08em; }
+  /* PASSWORD GATE */
   #passGate { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
   #passGate.hidden { display: none; }
   #appContent { display: none; }
@@ -160,6 +162,7 @@
   .gate-ticker { position: absolute; bottom: 2rem; left: 0; right: 0; overflow: hidden; border-top: 1px solid var(--border); padding: 0.75rem 0; }
   .gate-ticker-inner { display: flex; gap: 3rem; white-space: nowrap; animation: ticker 20s linear infinite; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
   @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  /* ── MOBILE RESPONSIVE ─────────────────────────────────── */
   @media (max-width: 640px) {
     .header { padding: 0.75rem 1.25rem; gap: 0.75rem; }
     .badge { display: none; }
@@ -184,6 +187,8 @@
     .stat-num { font-size: 1.6rem; }
     .conflict-item { grid-template-columns: 1fr; gap: 0.5rem; padding: 1rem; }
     .conflict-item > div:last-child { display: flex; align-items: center; gap: 0.5rem; }
+    .section-label[style*="space-between"] { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+    .btn-pdf { width: 100%; justify-content: center; }
     .suggestions-card { padding: 1.25rem; }
     .suggestion-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
     .suggestion-name { font-size: 1.2rem; }
@@ -198,8 +203,6 @@
     .gate-tagline { font-size: clamp(2rem, 10vw, 2.8rem); }
     .gate-sub { margin-bottom: 2rem; font-size: 0.65rem; }
     .gate-ticker { bottom: 1rem; }
-    .scan-row { flex-direction: column; }
-    .btn-new-search { width: 100%; text-align: center; }
   }
   @media (max-width: 400px) {
     .suggestion-grid { grid-template-columns: 1fr; }
@@ -209,477 +212,367 @@
 </head>
 <body>
 
-<!-- PASSWORD GATE — logo src is kept from original base64, replaced with inline SVG fallback -->
+<!-- PASSWORD GATE -->
 <div id="passGate">
   <div class="gate-grid"></div>
   <div class="gate-glow"></div>
   <div class="gate-content">
-    <!-- Original logo base64 preserved below — swap with your actual logo src -->
-    <img class="gate-logo-img" id="gateLogo" src="" alt="Trademarkyo" onerror="this.style.display='none'">
-    <div class="gate-tagline">Know Before You<span class="accent"> Register</span></div>
-    <div class="gate-sub">USPTO Clearance · AI Analysis · Instant Results</div>
+    <div class="gate-tagline">READY TO<br><span class="accent">TRADEMARK</span><br>TODAY?</div>
+    <div class="gate-sub">Enter your access code to continue</div>
     <div class="gate-input-wrap">
-      <input type="password" id="passInput" placeholder="••••••" autocomplete="off">
+      <input type="password" id="passInput" placeholder="· · · · · ·" maxlength="10" autocomplete="off" />
     </div>
-    <button class="gate-btn" onclick="checkPass()">Enter</button>
+    <button class="gate-btn" onclick="checkPass()">ENTER →</button>
     <div class="gate-error" id="gateError"></div>
   </div>
   <div class="gate-ticker">
     <div class="gate-ticker-inner">
-      <span>USPTO Live Database</span><span>·</span>
-      <span>Plural Variation Search</span><span>·</span>
-      <span>DuPont Factor Analysis</span><span>·</span>
-      <span>AI Risk Scoring</span><span>·</span>
-      <span>Class-Based Filtering</span><span>·</span>
-      <span>USPTO Live Database</span><span>·</span>
-      <span>Plural Variation Search</span><span>·</span>
-      <span>DuPont Factor Analysis</span><span>·</span>
-      <span>AI Risk Scoring</span><span>·</span>
-      <span>Class-Based Filtering</span><span>·</span>
+      <span>USPTO Live Data</span><span>·</span><span>AI DuPont Analysis</span><span>·</span>
+      <span>45 International Classes</span><span>·</span><span>Trademark Clearance</span><span>·</span>
+      <span>Approval Likelihood Score</span><span>·</span><span>Conflict Detection</span><span>·</span>
+      <span>USPTO Live Data</span><span>·</span><span>AI DuPont Analysis</span><span>·</span>
+      <span>45 International Classes</span><span>·</span><span>Trademark Clearance</span><span>·</span>
+      <span>Approval Likelihood Score</span><span>·</span><span>Conflict Detection</span><span>·</span>
+    </div>
+  </div>
+</div>
+
+<!-- DRILL-DOWN MODAL -->
+<div id="markModal">
+  <div class="modal-backdrop" onclick="closeModal()"></div>
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:0.4rem">Conflict Detail</div>
+        <div class="modal-mark" id="modalMarkName">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-tags" id="modalTags"></div>
+      <div class="modal-grid" id="modalGrid"></div>
+      <div class="modal-field" id="modalGoods"></div>
+      <div class="modal-divider"></div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:0.75rem">AI Conflict Analysis</div>
+      <div class="modal-analysis" id="modalAnalysis"></div>
+      <div style="margin-top:1.5rem" id="modalLinks"></div>
     </div>
   </div>
 </div>
 
 <!-- MAIN APP -->
 <div id="appContent">
-  <header class="header">
-    <img class="logo-img" id="appLogo" src="" alt="Trademarkyo" onerror="this.style.display='none'">
-    <span class="badge">USPTO Clearance Scanner</span>
-    <div class="live-indicator"><div class="live-dot"></div>Live USPTO</div>
-  </header>
+<header class="header">
+  <img class="logo-img" src="data:image/png;base64,/9j//" alt="Trademarkyo">
+  <div style="display:flex;align-items:center;gap:1.5rem">
+    <div class="live-indicator"><div class="live-dot"></div>LIVE USPTO DATA</div>
+    <div class="badge">AI TRADEMARK ANALYSIS</div>
+  </div>
+</header>
 
-  <section class="hero">
-    <div class="hero-eyebrow">Trademark Intelligence</div>
-    <h1>Clear Your<span class="highlight">Mark.</span></h1>
-    <p class="hero-sub">Real-time USPTO database search with AI-powered DuPont analysis. Searches exact match, plurals, and common variations automatically.</p>
-  </section>
+<section class="hero">
+  <div class="hero-eyebrow">AI-Powered Estimate</div>
+  <h1>WILL YOUR <span class="highlight">TRADEMARK</span> GET APPROVED?</h1>
+  <p class="hero-sub">Queries the live USPTO database for real conflicts, then runs AI analysis to score your approval likelihood — before you spend money on an attorney.</p>
+</section>
 
-  <section class="search-container">
-    <div class="search-box">
-      <label class="field-label">Mark Name + International Class</label>
-      <div class="input-row">
-        <input type="text" id="markInput" placeholder="e.g. NIKE" autocomplete="off" spellcheck="false">
-        <select class="class-select" id="classSelect">
-          <option value="">All Classes</option>
-          <optgroup label="Goods — Classes 1–34">
-            <option value="1">Class 1 — Chemicals</option>
-            <option value="2">Class 2 — Paints &amp; Coatings</option>
-            <option value="3">Class 3 — Cosmetics &amp; Cleaning Products</option>
-            <option value="4">Class 4 — Lubricants &amp; Fuels</option>
-            <option value="5">Class 5 — Pharmaceuticals &amp; Supplements</option>
-            <option value="6">Class 6 — Metal Goods &amp; Hardware</option>
-            <option value="7">Class 7 — Machinery &amp; Machine Tools</option>
-            <option value="8">Class 8 — Hand Tools &amp; Cutlery</option>
-            <option value="9">Class 9 — Electronics, Software &amp; Tech</option>
-            <option value="10">Class 10 — Medical Devices</option>
-            <option value="11">Class 11 — Appliances, Lighting &amp; HVAC</option>
-            <option value="12">Class 12 — Vehicles &amp; Transportation</option>
-            <option value="13">Class 13 — Firearms &amp; Ammunition</option>
-            <option value="14">Class 14 — Jewelry, Watches &amp; Precious Metals</option>
-            <option value="15">Class 15 — Musical Instruments</option>
-            <option value="16">Class 16 — Paper, Printed Matter &amp; Stationery</option>
-            <option value="17">Class 17 — Rubber, Plastics &amp; Insulation</option>
-            <option value="18">Class 18 — Leather Goods, Bags &amp; Luggage</option>
-            <option value="19">Class 19 — Building Materials (non-metal)</option>
-            <option value="20">Class 20 — Furniture &amp; Home Furnishings</option>
-            <option value="21">Class 21 — Housewares, Cookware &amp; Glass</option>
-            <option value="22">Class 22 — Ropes, Textiles (raw) &amp; Nets</option>
-            <option value="23">Class 23 — Yarns &amp; Threads</option>
-            <option value="24">Class 24 — Fabrics &amp; Textile Goods</option>
-            <option value="25">Class 25 — Clothing, Footwear &amp; Headwear</option>
-            <option value="26">Class 26 — Lace, Ribbons &amp; Embroidery</option>
-            <option value="27">Class 27 — Carpets, Rugs &amp; Floor Coverings</option>
-            <option value="28">Class 28 — Toys, Games &amp; Sporting Goods</option>
-            <option value="29">Class 29 — Meat, Fish, Dairy &amp; Prepared Foods</option>
-            <option value="30">Class 30 — Coffee, Tea, Baked Goods &amp; Condiments</option>
-            <option value="31">Class 31 — Raw Agricultural &amp; Horticultural Products</option>
-            <option value="32">Class 32 — Beer &amp; Non-Alcoholic Beverages</option>
-            <option value="33">Class 33 — Alcoholic Beverages (excl. beer)</option>
-            <option value="34">Class 34 — Tobacco, Vaping &amp; Smokers' Articles</option>
-          </optgroup>
-          <optgroup label="Services — Classes 35–45">
-            <option value="35">Class 35 — Advertising, Marketing &amp; Business Services</option>
-            <option value="36">Class 36 — Financial, Banking &amp; Insurance Services</option>
-            <option value="37">Class 37 — Construction, Repair &amp; Installation</option>
-            <option value="38">Class 38 — Telecommunications &amp; Broadcasting</option>
-            <option value="39">Class 39 — Transportation, Shipping &amp; Travel</option>
-            <option value="40">Class 40 — Treatment &amp; Processing of Materials</option>
-            <option value="41">Class 41 — Education, Entertainment &amp; Sports</option>
-            <option value="42">Class 42 — Scientific, Tech &amp; Software Services</option>
-            <option value="43">Class 43 — Restaurant, Hotel &amp; Food Services</option>
-            <option value="44">Class 44 — Medical, Beauty &amp; Agricultural Services</option>
-            <option value="45">Class 45 — Legal, Security &amp; Personal Services</option>
-          </optgroup>
-        </select>
-      </div>
-      <div class="scan-row">
-        <button class="btn-scan" id="scanBtn" onclick="runSearch()">Scan Trademark</button>
-        <button class="btn-new-search" id="newSearchBtn" onclick="resetSearch()">← New Search</button>
-      </div>
+<div class="search-container">
+  <div class="search-box">
+    <label class="field-label">Enter your trademark name</label>
+    <div class="input-row">
+      <!-- CHANGE 1: placeholder changed from GOLDYN to NIKE -->
+      <input type="text" id="markInput" placeholder="e.g. NIKE" autocomplete="off" />
+      <select class="class-select" id="classSelect">
+        <option value="">All Classes</option>
+        <optgroup label="── Goods ──────────────">
+        <option value="1">Class 1 — Chemicals</option>
+        <option value="2">Class 2 — Paints & Coatings</option>
+        <option value="3">Class 3 — Cosmetics & Cleaning</option>
+        <option value="4">Class 4 — Lubricants & Fuels</option>
+        <option value="5">Class 5 — Pharmaceuticals & Supplements</option>
+        <option value="6">Class 6 — Metal Goods</option>
+        <option value="7">Class 7 — Machinery</option>
+        <option value="8">Class 8 — Hand Tools</option>
+        <option value="9">Class 9 — Electronics & Software</option>
+        <option value="10">Class 10 — Medical Devices</option>
+        <option value="11">Class 11 — Lighting & HVAC</option>
+        <option value="12">Class 12 — Vehicles</option>
+        <option value="13">Class 13 — Firearms</option>
+        <option value="14">Class 14 — Jewelry & Watches</option>
+        <option value="15">Class 15 — Musical Instruments</option>
+        <option value="16">Class 16 — Paper & Printed Matter</option>
+        <option value="17">Class 17 — Rubber & Plastics</option>
+        <option value="18">Class 18 — Leather Goods & Bags</option>
+        <option value="19">Class 19 — Building Materials</option>
+        <option value="20">Class 20 — Furniture</option>
+        <option value="21">Class 21 — Housewares & Glass</option>
+        <option value="22">Class 22 — Ropes & Fibers</option>
+        <option value="23">Class 23 — Yarns & Threads</option>
+        <option value="24">Class 24 — Textiles & Fabrics</option>
+        <option value="25">Class 25 — Clothing & Footwear</option>
+        <option value="26">Class 26 — Lace & Embroidery</option>
+        <option value="27">Class 27 — Carpets & Floor Coverings</option>
+        <option value="28">Class 28 — Games & Sporting Goods</option>
+        <option value="29">Class 29 — Food (Meat, Dairy, Processed)</option>
+        <option value="30">Class 30 — Food (Staple, Bakery, Coffee)</option>
+        <option value="31">Class 31 — Fresh Food & Agriculture</option>
+        <option value="32">Class 32 — Beverages (Non-Alcoholic)</option>
+        <option value="33">Class 33 — Alcoholic Beverages</option>
+        <option value="34">Class 34 — Tobacco & Smoking</option>
+        </optgroup>
+        <optgroup label="── Services ────────────">
+        <option value="35">Class 35 — Advertising & Business</option>
+        <option value="36">Class 36 — Financial & Insurance</option>
+        <option value="37">Class 37 — Construction & Repair</option>
+        <option value="38">Class 38 — Telecommunications</option>
+        <option value="39">Class 39 — Transport & Travel</option>
+        <option value="40">Class 40 — Treatment of Materials</option>
+        <option value="41">Class 41 — Education & Entertainment</option>
+        <option value="42">Class 42 — Software & Tech Services</option>
+        <option value="43">Class 43 — Food & Lodging Services</option>
+        <option value="44">Class 44 — Medical & Health Services</option>
+        <option value="45">Class 45 — Legal & Personal Services</option>
+        </optgroup>
+      </select>
     </div>
-  </section>
-
-  <section class="results-container" id="resultsContainer"></section>
-  <section id="suggestionsContainer"></section>
-
-  <div class="disclaimer">
-    ⚠ Trademarkyo provides clearance research assistance only — not legal advice. Always consult a licensed trademark attorney before filing. Searches automatically include plural and common variation forms per USPTO examination practice.
+    <!-- CHANGE 3: scan button + new search button -->
+    <button class="btn-scan" id="scanBtn" onclick="runScan()">ANALYZE WITH AI →</button>
+    <button class="btn-new-search" id="newSearchBtn" onclick="resetSearch()">← NEW SEARCH</button>
   </div>
 </div>
 
-<!-- MARK DETAIL MODAL -->
-<div id="markModal">
-  <div class="modal-backdrop" onclick="closeModal()"></div>
-  <div class="modal-box">
-    <div class="modal-header">
-      <div>
-        <div class="modal-field-label">Conflicting Mark</div>
-        <div class="modal-mark" id="modalMarkName">—</div>
-      </div>
-      <button class="modal-close" onclick="closeModal()">×</button>
-    </div>
-    <div class="modal-body" id="modalBody"></div>
-  </div>
+<div class="results-container" id="resultsContainer"></div>
+<div id="suggestionsContainer" style="max-width:900px;margin:0 auto;padding:0 3rem;"></div>
+
+<div class="disclaimer">
+  ⚠ NOT LEGAL ADVICE — This tool queries live USPTO data and uses AI analysis to estimate approval likelihood. Results are estimates only and should not substitute for consultation with a licensed trademark attorney. Common law rights may exist outside the USPTO database.
 </div>
+</div><!-- end #appContent -->
 
 <script>
-// ─── PASSWORD ────────────────────────────────────────────────────────────────
-const PASS = '551414';
 function checkPass() {
-  const v = document.getElementById('passInput').value;
-  if (v === PASS) {
+  const val = document.getElementById('passInput').value;
+  const err = document.getElementById('gateError');
+  if (val === '551414') {
     document.getElementById('passGate').classList.add('hidden');
     document.getElementById('appContent').classList.add('visible');
+    sessionStorage.setItem('tyo_auth', '1');
   } else {
-    const inp = document.getElementById('passInput');
-    inp.classList.add('error');
-    document.getElementById('gateError').textContent = 'Incorrect password.';
-    setTimeout(() => inp.classList.remove('error'), 500);
+    err.textContent = 'Incorrect code. Try again.';
+    const input = document.getElementById('passInput');
+    input.classList.add('error');
+    input.value = '';
+    setTimeout(() => { input.classList.remove('error'); err.textContent = ''; }, 1500);
   }
 }
-document.getElementById('passInput').addEventListener('keydown', e => { if (e.key === 'Enter') checkPass(); });
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem('tyo_auth') === '1') {
+    document.getElementById('passGate').classList.add('hidden');
+    document.getElementById('appContent').classList.add('visible');
+  }
+  document.getElementById('passInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPass(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+});
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let currentResults = [];
-let currentAnalysis = null;
-let searchLocked = false;
-
-// ─── INPUT LOCK / RESET ───────────────────────────────────────────────────────
+// CHANGE 3: lock/unlock functions
 function lockInputs() {
   document.getElementById('markInput').disabled = true;
   document.getElementById('classSelect').disabled = true;
   document.getElementById('newSearchBtn').style.display = 'block';
-  searchLocked = true;
 }
-
 function resetSearch() {
-  const markInput = document.getElementById('markInput');
-  const classSelect = document.getElementById('classSelect');
-  markInput.disabled = false;
-  classSelect.disabled = false;
-  markInput.value = '';
-  classSelect.value = '';
+  document.getElementById('markInput').disabled = false;
+  document.getElementById('classSelect').disabled = false;
+  document.getElementById('markInput').value = '';
+  document.getElementById('classSelect').value = '';
   document.getElementById('newSearchBtn').style.display = 'none';
   document.getElementById('resultsContainer').innerHTML = '';
   document.getElementById('suggestionsContainer').innerHTML = '';
-  currentResults = [];
-  currentAnalysis = null;
-  searchLocked = false;
-  markInput.focus();
+  _conflictStore = [];
+  _currentMark = ''; _currentClass = ''; _currentAnalysis = null; _lastScanData = null;
+  document.getElementById('markInput').focus();
 }
 
-// ─── SEARCH ────────────────────────────────────────────────────────────────────
-async function runSearch() {
-  if (searchLocked) return;
-  const markName = document.getElementById('markInput').value.trim();
-  const classCode = document.getElementById('classSelect').value;
-  if (!markName) { document.getElementById('markInput').focus(); return; }
+let _conflictStore = [];
+function openModal(idx) {
+  const c = _conflictStore[idx];
+  if (!c) return;
+  const risk = (c.riskLevel || 'MEDIUM').toUpperCase();
+  const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
+  document.getElementById('modalMarkName').textContent = c.mark || 'Unknown Mark';
+  document.getElementById('modalTags').innerHTML = `<span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span><span class="risk-tag ${riskClass}">${risk} RISK</span>`;
+  document.getElementById('modalGrid').innerHTML = `<div class="modal-stat"><div class="modal-stat-label">Serial Number</div><div class="modal-stat-value" style="font-family:'DM Mono',monospace;font-size:0.85rem">${c.serialNumber || 'N/A'}</div></div><div class="modal-stat"><div class="modal-stat-label">Status</div><div class="modal-stat-value" style="color:${c.isLive ? 'var(--green)' : 'var(--muted)'}">${c.isLive ? 'Live / Active' : 'Dead / Inactive'}</div></div>`;
+  document.getElementById('modalGoods').innerHTML = `<div class="modal-field-label">Goods & Services Overlap</div><div class="modal-field-value">${c.goods || 'No description available.'}</div>`;
+  document.getElementById('modalAnalysis').innerHTML = `<strong>Similarity:</strong> ${c.reason || 'N/A'}<br><br><strong>Conflict Assessment:</strong> This mark presents a <strong>${risk.toLowerCase()} risk</strong> of confusion with your proposed mark. ${c.isLive ? 'This is an active registration and would be cited against your application.' : 'This mark is no longer active, which reduces but does not eliminate risk.'}`;
+  const usptoUrl = c.serialNumber ? `https://tsdr.uspto.gov/#caseNumber=${c.serialNumber}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch` : null;
+  document.getElementById('modalLinks').innerHTML = usptoUrl ? `<div class="modal-field-label" style="margin-bottom:0.5rem">View on USPTO</div><div class="modal-field-value"><a href="${usptoUrl}" target="_blank" rel="noopener">Open TSDR Record →</a></div>` : '';
+  document.getElementById('markModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('markModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
 
-  lockInputs();
-  document.getElementById('scanBtn').disabled = true;
-
-  const rc = document.getElementById('resultsContainer');
-  const sc = document.getElementById('suggestionsContainer');
-  sc.innerHTML = '';
-
-  rc.innerHTML = `
-    <div class="loading-state">
-      <div class="loading-spinner"></div>
-      <div class="loading-text">Scanning USPTO Database</div>
-      <div class="loading-step" id="loadingStep">Searching exact match + plural variations…</div>
-    </div>`;
-
-  const steps = [
-    'Searching exact match + plural variations…',
-    'Cross-referencing live USPTO records…',
-    'Running DuPont factor analysis…',
-    'Calculating conflict risk scores…',
-  ];
-  let stepIdx = 0;
-  const stepTimer = setInterval(() => {
-    stepIdx = (stepIdx + 1) % steps.length;
-    const el = document.getElementById('loadingStep');
-    if (el) el.textContent = steps[stepIdx];
-  }, 3500);
-
+let _currentMark = '', _currentClass = '', _currentAnalysis = null;
+async function generateSuggestions(mark, classCode, analysis) {
+  const container = document.getElementById('suggestionsContainer');
+  const score = Number(analysis.approvalScore || 0);
+  if (score >= 70) { container.innerHTML = ''; return; }
+  const risks = (analysis.mainRisks || []).join('; ');
+  const conflicts = (analysis.conflictAnalysis || []).map(c => c.markName).filter(Boolean).join(', ');
+  container.innerHTML = `<div class="suggestions-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem"><div><div class="section-label" style="margin-bottom:0.25rem">Alternative Name Suggestions</div><div class="suggestions-intro" style="margin-bottom:0">Your score of <strong style="color:${score >= 40 ? 'var(--yellow)' : 'var(--red)'}">${score}%</strong> suggests trademark conflicts. Here are AI-generated alternatives with stronger approval potential.</div></div><button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button></div><div class="suggestions-loading"><div class="loading-spinner"></div><div class="loading-text" style="font-size:0.7rem">Generating alternatives...</div></div></div>`;
   try {
-    const searchRes = await fetch('/api/search', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ markName, classCode }),
-    });
-    const searchData = await searchRes.json();
-    currentResults = searchData.results || [];
-
-    const el = document.getElementById('loadingStep');
-    if (el) el.textContent = 'Running AI analysis…';
-
-    const analyzeRes = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ markName, classCode, results: currentResults }),
-    });
-    currentAnalysis = await analyzeRes.json();
-
-    clearInterval(stepTimer);
-    document.getElementById('scanBtn').disabled = false;
-    renderResults(markName, classCode, currentResults, currentAnalysis);
-    fetchSuggestions(markName, classCode, currentAnalysis);
-
+    const resp = await fetch('/api/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markName: mark, classCode, score, risks, conflicts }) });
+    if (!resp.ok) throw new Error('Suggestion API failed');
+    const data = await resp.json();
+    const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+    if (suggestions.length === 0) throw new Error('No suggestions returned');
+    const grid = suggestions.map(s => `<div class="suggestion-item" onclick="trySuggestion('${s.name}')"><div class="suggestion-score-badge">↑ Higher Approval</div><div class="suggestion-name">${s.name}</div><div class="suggestion-why">${s.reason}</div></div>`).join('');
+    container.innerHTML = `<div class="suggestions-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;flex-wrap:wrap;gap:1rem"><div class="section-label" style="margin-bottom:0">Alternative Name Suggestions</div><button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button></div><p class="suggestions-intro">Your score of <strong style="color:${score >= 40 ? 'var(--yellow)' : 'var(--red)'}">${score}%</strong> suggests trademark conflicts. These alternatives are designed to avoid the identified conflicts while preserving your brand intent.</p><div class="suggestion-grid">${grid}</div><div class="try-name-hint">↑ Click any name to instantly scan it</div></div>`;
   } catch (e) {
-    clearInterval(stepTimer);
-    document.getElementById('scanBtn').disabled = false;
-    rc.innerHTML = `<div class="error-box">Error: ${e.message}</div>`;
+    container.innerHTML = `<div class="suggestions-card"><div class="section-label" style="margin-bottom:1rem">Alternative Name Suggestions</div><div class="error-box">Could not generate suggestions: ${e.message}</div></div>`;
   }
 }
+function trySuggestion(name) {
+  document.getElementById('markInput').value = name;
+  document.getElementById('markInput').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => runScan(), 300);
+}
 
-// ─── RENDER ───────────────────────────────────────────────────────────────────
-function renderResults(markName, classCode, results, analysis) {
-  const rc = document.getElementById('resultsContainer');
-  const score = analysis.approvalScore || 0;
+function downloadPDF(mark, classCode, score, analysis, usptoData) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210; const margin = 18; const contentW = W - margin * 2; let y = 0;
+  const scoreColor = score >= 70 ? [71,255,138] : score >= 40 ? [255,204,71] : [255,71,71];
+  doc.setFillColor(10,10,10); doc.rect(0, 0, W, 28, 'F');
+  doc.setFillColor(...scoreColor); doc.rect(0, 0, 5, 28, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(232,255,71); doc.text('TRADEMARKYO', margin, 12);
+  doc.setFontSize(8); doc.setTextColor(100,100,100); doc.text('USPTO TRADEMARK CLEARANCE REPORT', margin, 19);
+  doc.setTextColor(180,180,180); doc.text(`Generated: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, margin, 25);
+  y = 38;
+  doc.setFillColor(17,17,17); doc.rect(margin, y, contentW, 28, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(240,240,240); doc.text(mark, margin + 6, y + 13);
+  if (classCode) { doc.setFontSize(9); doc.setTextColor(100,100,100); doc.text(`Class ${classCode}`, margin + 6, y + 21); }
+  doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(...scoreColor); doc.text(String(score), W - margin - 22, y + 14);
+  doc.setFontSize(7); doc.setTextColor(100,100,100); doc.text('APPROVAL SCORE', W - margin - 28, y + 21);
+  doc.setFontSize(8); doc.setTextColor(...scoreColor); doc.text((analysis.verdict||'').toUpperCase(), W - margin - 16, y + 26);
+  y += 34;
+  const statW = contentW / 4;
+  [{label:'RECORDS REVIEWED',val:String(usptoData.totalFound||0)},{label:'LIVE CONFLICTS',val:String((analysis.conflictAnalysis||[]).filter(c=>String(c.status||'').toUpperCase().includes('LIVE')).length)},{label:'DEAD MARKS',val:String((analysis.conflictAnalysis||[]).filter(c=>!String(c.status||'').toUpperCase().includes('LIVE')).length)},{label:'DATA SOURCE',val:usptoData.liveSearch?'LIVE':'AI ONLY'}].forEach((s,i)=>{
+    const x=margin+i*statW; doc.setFillColor(26,26,26); doc.rect(x,y,statW-1,16,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(232,255,71); doc.text(s.val,x+statW/2-2,y+9,{align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(100,100,100); doc.text(s.label,x+statW/2-2,y+14,{align:'center'});
+  }); y+=22;
+  if(analysis.distinctiveness){const lines=doc.splitTextToSize(`DISTINCTIVENESS: ${analysis.distinctiveness}`,contentW);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(150,150,150);doc.text(lines,margin,y);y+=lines.length*4+4;}
+  doc.setFillColor(15,15,15);doc.rect(margin,y,contentW,6,'F');doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(232,255,71);doc.text('AI RECOMMENDATION',margin+3,y+4);y+=8;
+  const recLines=doc.splitTextToSize(analysis.recommendation||'',contentW-6);doc.setFillColor(15,15,15);doc.rect(margin,y,contentW,recLines.length*4.5+6,'F');doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(220,220,220);doc.text(recLines,margin+3,y+5);y+=recLines.length*4.5+10;
+  if((analysis.mainRisks||[]).length>0){doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(100,100,100);doc.text('KEY RISK FACTORS',margin,y);y+=5;analysis.mainRisks.forEach(r=>{const rl=doc.splitTextToSize(`▸  ${r}`,contentW-4);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(180,180,180);doc.text(rl,margin+2,y);y+=rl.length*4+2;});y+=4;}
+  const cfls=analysis.conflictAnalysis||[];
+  if(cfls.length>0){if(y>220){doc.addPage();y=20;}doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(100,100,100);doc.text(`CONFLICT ANALYSIS (${cfls.length} MARKS)`,margin,y);y+=6;
+    cfls.forEach(c=>{if(y>260){doc.addPage();y=20;}const risk=(c.riskLevel||'medium').toUpperCase();const rColor=risk==='HIGH'?[255,71,71]:risk==='MEDIUM'?[255,204,71]:[71,255,138];const isLive=String(c.status||'').toUpperCase().includes('LIVE');
+      doc.setFillColor(17,17,17);doc.rect(margin,y,contentW,20,'F');doc.setFillColor(...rColor);doc.rect(margin,y,3,20,'F');
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(240,240,240);doc.text(c.markName||'N/A',margin+6,y+7);
+      doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(100,100,100);doc.text(`Serial: ${c.serialNumber||'N/A'}`,margin+6,y+12);
+      doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(...rColor);doc.text(`${risk} RISK`,W-margin-5,y+7,{align:'right'});
+      doc.setFont('helvetica','normal');doc.setTextColor(isLive?71:100,isLive?255:100,isLive?138:100);doc.text(isLive?'● LIVE':'○ DEAD',W-margin-5,y+13,{align:'right'});
+      const gt=(c.goodsServicesOverlap||'').substring(0,90);if(gt){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(130,130,130);doc.text(gt+(gt.length>=90?'...':''),margin+6,y+17);}
+      y+=22;});
+  }
+  doc.setFillColor(10,10,10);doc.rect(0,285,W,12,'F');doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(80,80,80);doc.text('NOT LEGAL ADVICE — This report is for informational purposes only. Consult a licensed trademark attorney before filing.',margin,292);doc.setTextColor(100,100,100);doc.text('trademarkyo.com',W-margin,292,{align:'right'});
+  doc.save(`Trademarkyo_${mark.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+const API_BASE = '';
+let _lastScanData = null;
+async function runScan() {
+  const mark = document.getElementById('markInput').value.trim().toUpperCase();
+  const classCode = document.getElementById('classSelect').value;
+  const container = document.getElementById('resultsContainer');
+  const btn = document.getElementById('scanBtn');
+  if (!mark) { document.getElementById('markInput').focus(); return; }
+  _currentMark = mark; _currentClass = classCode;
+  document.getElementById('suggestionsContainer').innerHTML = '';
+
+  // CHANGE 3: lock inputs immediately on scan
+  lockInputs();
+  btn.disabled = true;
+
+  container.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Scanning USPTO Database</div><div class="loading-step" id="loadingStep">Connecting to live USPTO...</div></div>`;
+  const updateStep = (msg) => { const el = document.getElementById('loadingStep'); if (el) el.textContent = msg; };
+  try {
+    updateStep('Querying USPTO trademark database...');
+    const searchRes = await fetch(`${API_BASE}/api/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markName: mark, classCode }) });
+    if (!searchRes.ok) throw new Error(`Search failed (${searchRes.status})`);
+    const searchData = await searchRes.json();
+    const usptoData = { liveSearch: searchData.mode !== 'ai_only', mode: searchData.mode, totalFound: Array.isArray(searchData.results) ? searchData.results.length : 0, results: Array.isArray(searchData.results) ? searchData.results : [] };
+    updateStep(`Found ${usptoData.totalFound} marks — running AI DuPont analysis...`);
+    const analysisRes = await fetch(`${API_BASE}/api/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markName: mark, classCode, results: usptoData.results }) });
+    if (!analysisRes.ok) throw new Error(`Analysis failed (${analysisRes.status})`);
+    const analysis = await analysisRes.json();
+    _lastScanData = { mark, classCode, usptoData, analysis };
+    _currentAnalysis = analysis;
+    renderResults(mark, classCode, usptoData, analysis);
+    if (Number(analysis.approvalScore || 0) < 70) generateSuggestions(mark, classCode, analysis);
+  } catch (err) {
+    container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
+  }
+  btn.disabled = false;
+}
+
+function renderResults(mark, classCode, usptoData, analysis) {
+  const container = document.getElementById('resultsContainer');
+  const score = Number(analysis.approvalScore || 0);
   const scoreClass = score >= 70 ? 'score-green' : score >= 40 ? 'score-yellow' : 'score-red';
   const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
-  const verdict = (analysis.verdict || 'caution').toUpperCase();
-  const liveConflicts = results.filter(r => r.liveDeadStatus === 'LIVE').length;
-  const variationHits = results.filter(r => r.isVariation).length;
-
-  rc.innerHTML = `
-    <div class="verdict-card">
-      <div class="verdict-header">
-        <div>
-          <div class="verdict-title">Trademark Clearance Report</div>
-          <div class="verdict-mark">${markName.toUpperCase()}</div>
-          ${classCode ? `<div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);margin-top:0.3rem;letter-spacing:0.1em;">IC ${String(classCode).padStart(2,'0')}</div>` : ''}
-        </div>
-        <div class="score-display">
-          <span class="score-number ${scoreClass}">${score}</span>
-          <span class="score-label">Approval Score</span>
-        </div>
+  const conflicts = Array.isArray(analysis.conflictAnalysis) ? analysis.conflictAnalysis : [];
+  const normalizedConflicts = conflicts.map(c => { const status = String(c.status || '').toUpperCase(); const isLive = status.includes('LIVE') || status === 'LIVE'; return { serialNumber: c.serialNumber || null, mark: c.markName || null, goods: c.goodsServicesOverlap || '', isLive, riskLevel: String(c.riskLevel || 'medium').toUpperCase(), reason: c.similarity || '' }; });
+  _conflictStore = normalizedConflicts;
+  const liveConflicts = normalizedConflicts.filter(c => c.isLive).length;
+  const deadConflicts = normalizedConflicts.filter(c => !c.isLive).length;
+  const conflictsHTML = normalizedConflicts.length > 0
+    ? `<div class="click-hint">Tap any row for full detail →</div>` + normalizedConflicts.map((c, i) => { const risk = c.riskLevel || 'MEDIUM'; const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low'; return `<div class="conflict-item" onclick="openModal(${i})"><div><div class="conflict-mark">${c.mark || 'N/A'}</div><div class="conflict-goods">${c.goods ? c.goods.substring(0,120)+(c.goods.length>120?'...':'') : 'No goods description'}</div></div><div><div class="conflict-serial">${c.serialNumber || ''}</div><div style="margin-top:0.3rem"><span class="status-tag ${c.isLive?'live':'dead'}">${c.isLive?'● LIVE':'○ DEAD'}</span></div></div><div style="text-align:right"><span class="risk-tag ${riskClass}">${risk} RISK</span>${c.reason?`<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>`:''}</div></div>`; }).join('')
+    : '<div class="no-conflicts">✓ NO CONFLICTING MARKS IDENTIFIED</div>';
+  const risksHTML = (analysis.mainRisks || []).map(r => `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted);display:flex;gap:0.75rem"><span style="color:var(--accent);flex-shrink:0">▸</span>${r}</div>`).join('');
+  const sourceTag = usptoData.liveSearch ? `<span class="source-tag source-live">● LIVE SEARCH</span>` : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
+  const classLabel = classCode ? ` · Class ${classCode}` : '';
+  container.innerHTML = `<div class="verdict-card">
+    <div class="verdict-header">
+      <div>
+        <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
+        <div class="verdict-mark">${mark}</div>
+        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">${analysis.distinctiveness||''}${classLabel}</div>
       </div>
-      <div class="verdict-bar"><div class="verdict-bar-fill" style="width:0%;background:${barColor}" id="verdictBar"></div></div>
-      <div class="verdict-analysis">${analysis.recommendation || analysis.distinctiveness || 'Analysis complete.'}</div>
-      <div class="stats-row">
-        <div class="stat-box"><span class="stat-num">${results.length}</span><span class="stat-lbl">Records Found</span></div>
-        <div class="stat-box"><span class="stat-num">${liveConflicts}</span><span class="stat-lbl">Live Conflicts</span></div>
-        <div class="stat-box"><span class="stat-num">${variationHits}</span><span class="stat-lbl">Variation Hits</span></div>
-        <div class="stat-box"><span class="stat-num ${scoreClass}">${verdict}</span><span class="stat-lbl">Verdict</span></div>
+      <div class="score-display">
+        <span class="score-number ${scoreClass}">${score}</span>
+        <span class="score-label">Approval Likelihood</span>
+        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict||''}</div>
       </div>
-      ${analysis.mainRisks && analysis.mainRisks.length ? `
-        <div class="section-label">Risk Factors</div>
-        ${analysis.mainRisks.map(r => `<div style="font-size:0.85rem;color:var(--muted);padding:0.4rem 0;border-bottom:1px solid var(--border)">⚠ ${r}</div>`).join('')}
-        <div style="margin-bottom:1.5rem"></div>` : ''}
-      <div class="section-label" style="justify-content:space-between">
-        <span>Conflicting Marks</span>
-        <button class="btn-pdf" onclick="downloadPDF('${markName.replace(/'/g,"\\'")}','${classCode}')">
-          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 1h6l2 2v8H2V1z"/><path d="M7 1v3h3M4 6h4M4 8h3"/></svg>
-          Export PDF
-        </button>
-      </div>
-      ${results.length === 0 ? `<div class="no-conflicts">✓ No conflicting marks found in USPTO database</div>` : ''}
-      ${variationHits > 0 ? `<div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--accent);padding:0.6rem 0 0.4rem;letter-spacing:0.08em;">⚑ ${variationHits} result(s) found via plural/variation search — USPTO treats these forms as confusingly similar</div>` : ''}
-      <div id="conflictList">${renderConflicts(results, analysis)}</div>
-    </div>`;
-
-  setTimeout(() => {
-    const bar = document.getElementById('verdictBar');
-    if (bar) bar.style.width = score + '%';
-  }, 100);
-}
-
-function renderConflicts(results, analysis) {
-  if (!results.length) return '';
-  const conflictMap = {};
-  (analysis.conflictAnalysis || []).forEach(c => { if (c.serialNumber) conflictMap[c.serialNumber] = c; });
-
-  return results.map((r, i) => {
-    const ca = conflictMap[r.serialNumber] || {};
-    const risk = ca.riskLevel || 'low';
-    const riskClass = risk === 'high' ? 'risk-high' : risk === 'medium' ? 'risk-med' : 'risk-low';
-    const statusClass = r.liveDeadStatus === 'LIVE' ? 'live' : 'dead';
-    const markDisplay = ca.markName || r.markName || `Serial #${r.serialNumber}`;
-
-    return `
-      <div class="conflict-item" onclick="openModal(${i})">
-        <div>
-          <div class="conflict-mark">
-            ${markDisplay}
-            ${r.isVariation ? `<span class="variation-tag">VARIATION</span>` : ''}
-          </div>
-          <div class="conflict-goods">${(r.goodsServices || '').substring(0,120)}${(r.goodsServices || '').length > 120 ? '…' : ''}</div>
-        </div>
-        <div class="conflict-serial">${r.serialNumber || '—'}</div>
-        <div style="display:flex;flex-direction:column;gap:0.3rem;align-items:flex-end">
-          <span class="status-tag ${statusClass}">${r.liveDeadStatus || '—'}</span>
-          <span class="risk-tag ${riskClass}">${risk}</span>
-        </div>
-      </div>`;
-  }).join('');
-}
-
-// ─── MODAL ────────────────────────────────────────────────────────────────────
-function openModal(idx) {
-  const r = currentResults[idx];
-  if (!r) return;
-  const ca = (currentAnalysis?.conflictAnalysis || []).find(c => c.serialNumber === r.serialNumber) || {};
-  const markDisplay = ca.markName || r.markName || `Serial #${r.serialNumber}`;
-
-  document.getElementById('modalMarkName').textContent = markDisplay;
-
-  const usptoUrl = r.serialNumber
-    ? `https://tsdr.uspto.gov/#caseNumber=${r.serialNumber}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch`
-    : null;
-
-  document.getElementById('modalBody').innerHTML = `
-    <div class="modal-tags">
-      <span class="status-tag ${r.liveDeadStatus === 'LIVE' ? 'live' : 'dead'}">${r.liveDeadStatus || '—'}</span>
-      ${r.isVariation ? `<span class="variation-tag">PLURAL / VARIATION MATCH</span>` : ''}
-      ${r.matchedVariant ? `<span class="source-tag source-ai">Matched as: ${r.matchedVariant}</span>` : ''}
     </div>
-    <div class="modal-grid">
-      <div class="modal-stat"><div class="modal-stat-label">Serial Number</div><div class="modal-stat-value">${r.serialNumber || '—'}</div></div>
-      <div class="modal-stat"><div class="modal-stat-label">Risk Level</div>
-        <div class="modal-stat-value" style="color:${ca.riskLevel === 'high' ? 'var(--red)' : ca.riskLevel === 'medium' ? 'var(--yellow)' : 'var(--green)'}">
-          ${(ca.riskLevel || '—').toUpperCase()}</div></div>
-      <div class="modal-stat"><div class="modal-stat-label">Int'l Class</div><div class="modal-stat-value">${r.internationalClass ? 'IC ' + String(r.internationalClass).padStart(2,'0') : '—'}</div></div>
-      <div class="modal-stat"><div class="modal-stat-label">Source</div><div class="modal-stat-value">${r.source === 'tmsearch' ? 'USPTO Live' : 'AI Analysis'}</div></div>
+    <div class="verdict-bar"><div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div></div>
+    <div class="stats-row">
+      <div class="stat-box"><span class="stat-num">${usptoData.totalFound||0}</span><span class="stat-lbl">Records Reviewed</span></div>
+      <div class="stat-box"><span class="stat-num" style="color:var(--red)">${liveConflicts}</span><span class="stat-lbl">Live Conflicts</span></div>
+      <div class="stat-box"><span class="stat-num" style="color:var(--muted)">${deadConflicts}</span><span class="stat-lbl">Dead Marks</span></div>
+      <div class="stat-box"><span class="stat-num" style="color:${barColor}">${score}%</span><span class="stat-lbl">Approval Score</span></div>
     </div>
-    ${ca.similarity ? `<div class="modal-field"><div class="modal-field-label">Mark Similarity</div><div class="modal-field-value">${ca.similarity}</div></div>` : ''}
-    ${ca.goodsServicesOverlap ? `<div class="modal-field"><div class="modal-field-label">Goods/Services Overlap</div><div class="modal-field-value">${ca.goodsServicesOverlap}</div></div>` : ''}
-    ${r.goodsServices ? `<div class="modal-field"><div class="modal-field-label">USPTO Record Text</div><div class="modal-field-value" style="font-size:0.8rem;color:var(--muted)">${r.goodsServices.substring(0,400)}</div></div>` : ''}
-    ${usptoUrl ? `<div class="modal-field"><div class="modal-field-label">USPTO Record</div><div class="modal-field-value"><a href="${usptoUrl}" target="_blank" rel="noopener">View on USPTO TSDR ↗</a></div></div>` : ''}`;
-
-  document.getElementById('markModal').classList.add('open');
+    <div class="section-label">AI Recommendation</div>
+    <div class="verdict-analysis">${analysis.recommendation||'No recommendation generated.'}</div>
+    ${risksHTML?`<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}`:''}
+    <div class="section-label" style="margin-top:2rem;justify-content:space-between">
+      <span style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">Conflict Analysis (${normalizedConflicts.length} marks reviewed)<span style="flex:1;height:1px;background:var(--border);display:block;min-width:20px"></span></span>
+      <button class="btn-pdf" onclick="downloadPDF('${mark}','${classCode}',${score},_lastScanData.analysis,_lastScanData.usptoData)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3M3 7v3a1 1 0 001 1h16a1 1 0 001-1V7"/></svg>
+        Download PDF
+      </button>
+    </div>
+    ${conflictsHTML}
+  </div>`;
+  setTimeout(() => { const bar = document.getElementById('barFill'); if (bar) bar.style.width = score + '%'; }, 100);
 }
 
-function closeModal() { document.getElementById('markModal').classList.remove('open'); }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-
-// ─── SUGGESTIONS ──────────────────────────────────────────────────────────────
-async function fetchSuggestions(markName, classCode, analysis) {
-  if (!analysis || analysis.approvalScore >= 80) return;
-  const sc = document.getElementById('suggestionsContainer');
-  sc.innerHTML = `
-    <div style="max-width:900px;margin:0 auto;padding:0 3rem 2rem">
-      <div class="suggestions-card">
-        <div class="section-label">AI Alternative Names</div>
-        <div class="suggestions-loading"><div class="loading-spinner"></div><div class="loading-text" style="font-size:0.7rem">Generating alternatives…</div></div>
-      </div>
-    </div>`;
-
-  try {
-    const res = await fetch('/api/suggest', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        markName, classCode,
-        score: analysis.approvalScore,
-        risks: (analysis.mainRisks || []).join(', '),
-        conflicts: (analysis.conflictAnalysis || []).map(c => c.markName).filter(Boolean).join(', '),
-      }),
-    });
-    const data = await res.json();
-    renderSuggestions(markName, classCode, analysis, data.suggestions || []);
-  } catch {
-    document.getElementById('suggestionsContainer').innerHTML = '';
-  }
-}
-
-function renderSuggestions(markName, classCode, analysis, suggestions) {
-  const sc = document.getElementById('suggestionsContainer');
-  if (!suggestions.length) { sc.innerHTML = ''; return; }
-
-  sc.innerHTML = `
-    <div style="max-width:900px;margin:0 auto;padding:0 3rem 3rem">
-      <div class="suggestions-card">
-        <div class="section-label">AI Alternative Names</div>
-        <p class="suggestions-intro">Based on the conflicts found, here are ${suggestions.length} alternative marks with stronger clearance potential.</p>
-        <div class="suggestion-grid">
-          ${suggestions.map(s => `
-            <div class="suggestion-item" onclick="searchSuggestion('${s.name.replace(/'/g,"\\'")}')">
-              <div class="suggestion-score-badge">Try This</div>
-              <div class="suggestion-name">${s.name}</div>
-              <div class="suggestion-why">${s.reason}</div>
-            </div>`).join('')}
-        </div>
-        <p class="try-name-hint">↑ Click any name to run a new clearance search on it</p>
-      </div>
-    </div>`;
-}
-
-function searchSuggestion(name) {
-  resetSearch();
-  document.getElementById('markInput').value = name;
-  runSearch();
-}
-
-// ─── PDF ──────────────────────────────────────────────────────────────────────
-function downloadPDF(markName, classCode) {
-  if (!window.jspdf) { alert('PDF library not loaded'); return; }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const analysis = currentAnalysis || {};
-  const results = currentResults || [];
-
-  doc.setFontSize(22); doc.text('Trademarkyo — Clearance Report', 20, 20);
-  doc.setFontSize(11);
-  doc.text(`Mark: ${markName.toUpperCase()}`, 20, 34);
-  if (classCode) doc.text(`Class: IC ${String(classCode).padStart(2,'0')}`, 20, 41);
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, classCode ? 48 : 41);
-
-  let y = 60;
-  doc.setFontSize(14); doc.text('Analysis Summary', 20, y); y += 8;
-  doc.setFontSize(10);
-  doc.text(`Approval Score: ${analysis.approvalScore || '—'}%`, 20, y); y += 6;
-  doc.text(`Verdict: ${(analysis.verdict || '—').toUpperCase()}`, 20, y); y += 6;
-  if (analysis.recommendation) {
-    const lines = doc.splitTextToSize(analysis.recommendation, 170);
-    doc.text(lines, 20, y); y += lines.length * 5 + 4;
-  }
-
-  if (analysis.mainRisks && analysis.mainRisks.length) {
-    y += 4; doc.setFontSize(12); doc.text('Risk Factors', 20, y); y += 7;
-    doc.setFontSize(9);
-    analysis.mainRisks.forEach(r => {
-      const lines = doc.splitTextToSize('• ' + r, 170);
-      if (y > 270) { doc.addPage(); y = 20; }
-      doc.text(lines, 20, y); y += lines.length * 5;
-    });
-  }
-
-  if (results.length) {
-    y += 4; if (y > 270) { doc.addPage(); y = 20; }
-    doc.setFontSize(12); doc.text('Conflicting Records', 20, y); y += 7;
-    doc.setFontSize(9);
-    results.forEach(r => {
-      if (y > 270) { doc.addPage(); y = 20; }
-      const ca = (analysis.conflictAnalysis || []).find(c => c.serialNumber === r.serialNumber) || {};
-      const label = `${r.serialNumber || '—'} | ${r.liveDeadStatus || '—'} | Risk: ${(ca.riskLevel || '—').toUpperCase()}${r.isVariation ? ' [VARIATION]' : ''}`;
-      doc.text(label, 20, y); y += 5;
-    });
-  }
-
-  doc.save(`trademarkyo-${markName.toLowerCase().replace(/\s+/g,'-')}-${Date.now()}.pdf`);
-}
+document.getElementById('markInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') runScan(); });
 </script>
 </body>
 </html>
