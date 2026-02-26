@@ -86,7 +86,7 @@ function getDateRange(mode) {
   let from;
   if (mode === 'full') {
     const d = new Date(today);
-    d.setFullYear(d.getFullYear() - 2);
+    d.setDate(d.getDate() - 30);
     from = d.toISOString().split('T')[0];
   } else if (mode === 'daily') {
     const d = new Date(today);
@@ -375,8 +375,11 @@ async function run(mode) {
     }
 
     log(`Processing ${files.length} file(s)...`);
+    // Cap at 30 files per run to avoid memory exhaustion on Railway's 512MB container
+    const batch = files.slice(0, 30);
+    if (files.length > 30) log(`Capping at 30 files (found ${files.length})`);
 
-    for (const { fileName, downloadUrl } of files) {
+    for (const { fileName, downloadUrl } of batch) {
       const tmpPath = path.join(TMP_DIR, fileName || `dl_${Date.now()}.zip`);
       try {
         log(`Downloading: ${fileName}`);
