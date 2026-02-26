@@ -13,7 +13,7 @@ const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('[db] Unexpected pool error:', err.message);
+  console.error('[db] Pool error:', err.message);
 });
 
 async function initSchema() {
@@ -31,23 +31,14 @@ async function initSchema() {
         reg_date        VARCHAR(20),
         updated_at      TIMESTAMP DEFAULT NOW()
       );
-
       CREATE INDEX IF NOT EXISTS idx_tm_mark_lower ON trademarks (lower(mark_name));
-      CREATE INDEX IF NOT EXISTS idx_tm_status     ON trademarks (status);
-
+      CREATE INDEX IF NOT EXISTS idx_tm_status ON trademarks (status);
       CREATE TABLE IF NOT EXISTS loader_log (
-        id          SERIAL PRIMARY KEY,
-        run_date    TIMESTAMP DEFAULT NOW(),
-        status      VARCHAR(20),
+        id                SERIAL PRIMARY KEY,
+        run_date          TIMESTAMP DEFAULT NOW(),
+        status            VARCHAR(20),
         records_processed INTEGER DEFAULT 0,
-        message     TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS loader_state (
-        product TEXT NOT NULL,
-        file_name TEXT NOT NULL,
-        processed_at TIMESTAMP DEFAULT NOW(),
-        PRIMARY KEY (product, file_name)
+        message           TEXT
       );
     `);
     console.log('[db] Schema ready');
@@ -56,40 +47,49 @@ async function initSchema() {
   }
 }
 
-/**
- * Search trademarks by mark name, with optional class filter.
- * Returns up to 50 results, live marks first.
- */
+function getVariations(base) {
+  const v = new Set([base]);
+  if (base.endsWith('IES') && base.length > 4)  v.add(base.slice(0, -3) + 'Y');
+  else if (base.endsWith('ES') && base.length > 3) v.add(base.slice(0, -2));
+  else if (base.endsWith('S') && base.length > 2)  v.add(base.slice(0, -1));
+  if (!base.endsWith('S')) {
+    v.add(base + 'S');
+    if (/[XZ]$/.test(base) || /CH$|SH$/.test(base)) v.add(base + 'ES');
+    if (base.endsWith('Y') && base.length > 1) v.add(base.slice(0, -1) + 'IES');
+  }
+  if (base.endsWith('ING') && base.length > 4) {
+    v.add(base.slice(0, -3));
+    v.add(base.slice(0, -3) + 'E');
+  } else if (!base.includes(' ') && base.length <= 8 && !base.endsWith('ING')) {
+    v.add(base + 'ING');
+  }
+  return [...v].filter(x => x.length >= 2);
+}
+
 async function searchTrademarks(markName, classCode) {
   const name = markName.trim().toUpperCase();
   const variations = getVariations(name);
-
   console.log(`[db] Searching for: ${variations.join(', ')}`);
 
-  const exactConditions = variations.map((_, i) => `lower(mark_name) = lower($${i + 1})`);
-  const likeConditions = [`lower(mark_name) LIKE lower($${variations.length + 1})`];
-
-  const params = [...variations, `${name}%`];
+  const exactConds = variations.map((_, i) => `lower(mark_name) = lower($${i + 1})`);
+  const params = [...variations, name + '%'];
+  const likeCond = `lower(mark_name) LIKE lower($${variations.length + 1})`;
 
   let classFilter = '';
   if (classCode) {
     classFilter = ` AND (int_class LIKE $${params.length + 1} OR int_class IS NULL)`;
-    params.push(`%${classCode}%`);
+    params.push('%' + classCode + '%');
   }
 
   const query = `
-    SELECT *
-    FROM trademarks
-    WHERE (${[...exactConditions, ...likeConditions].join(' OR ')})
+    SELECT * FROM trademarks
+    WHERE (${[...exactConds, likeCond].join(' OR ')})
     ${classFilter}
-    ORDER BY
-      CASE WHEN status = 'LIVE' THEN 0 ELSE 1 END,
-      mark_name
+    ORDER BY CASE WHEN status = 'LIVE' THEN 0 ELSE 1 END, mark_name
     LIMIT 50
   `;
 
   const result = await pool.query(query, params);
-
   return result.rows.map(r => ({
     source: 'postgresql',
     serialNumber: r.serial_number,
@@ -105,53 +105,18 @@ async function searchTrademarks(markName, classCode) {
   }));
 }
 
-function getVariations(base) {
-  const variations = new Set([base]);
-
-  if (base.endsWith('IES') && base.length > 4) {
-    variations.add(base.slice(0, -3) + 'Y');
-  } else if (base.endsWith('ES') && base.length > 3) {
-    variations.add(base.slice(0, -2));
-  } else if (base.endsWith('S') && base.length > 2) {
-    variations.add(base.slice(0, -1));
-  }
-
-  if (!base.endsWith('S')) {
-    variations.add(base + 'S');
-    if (/[XZ]$/.test(base) || /CH$/.test(base) || /SH$/.test(base)) {
-      variations.add(base + 'ES');
-    }
-    if (base.endsWith('Y') && base.length > 1) {
-      variations.add(base.slice(0, -1) + 'IES');
-    }
-  }
-
-  if (base.endsWith('ING') && base.length > 4) {
-    variations.add(base.slice(0, -3));
-    variations.add(base.slice(0, -3) + 'E');
-  } else if (!base.includes(' ') && base.length <= 8 && !base.endsWith('ING')) {
-    variations.add(base + 'ING');
-  }
-
-  return [...variations].filter(v => v.length >= 2);
-}
-
 async function getLoaderStatus() {
   try {
-    const result = await pool.query('SELECT * FROM loader_log ORDER BY run_date DESC LIMIT 5');
-    return result.rows;
-  } catch {
-    return [];
-  }
+    const r = await pool.query('SELECT * FROM loader_log ORDER BY run_date DESC LIMIT 5');
+    return r.rows;
+  } catch { return []; }
 }
 
 async function getTrademarkCount() {
   try {
-    const result = await pool.query('SELECT COUNT(*) as count FROM trademarks');
-    return parseInt(result.rows[0].count, 10);
-  } catch {
-    return 0;
-  }
+    const r = await pool.query('SELECT COUNT(*) as count FROM trademarks');
+    return parseInt(r.rows[0].count, 10);
+  } catch { return 0; }
 }
 
 module.exports = { pool, initSchema, searchTrademarks, getLoaderStatus, getTrademarkCount };
