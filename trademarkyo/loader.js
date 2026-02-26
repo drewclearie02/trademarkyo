@@ -123,13 +123,22 @@ async function getFileList(mode) {
       else if (Array.isArray(data?.results)) files = data.results;
       else if (Array.isArray(data)) files = data;
 
+      // Dig into bulkDataProductBag if present
+      if (!files.length && data?.bulkDataProductBag) {
+        const bag = Array.isArray(data.bulkDataProductBag) ? data.bulkDataProductBag : [data.bulkDataProductBag];
+        for (const product of bag) {
+          const pf = product?.productFileArray?.productFile || product?.productFiles || product?.files || [];
+          files.push(...(Array.isArray(pf) ? pf : [pf]));
+        }
+      }
+
       log(`Raw response keys: ${Object.keys(data || {}).join(', ')}`);
       log(`Files found: ${files.length}`);
 
       if (files.length > 0) {
         const result = files.map(f => ({
-          fileName: f.fileName || f.name || f.fileTitle || f.title || '',
-          downloadUrl: f.fileDownloadUrl || f.downloadUrl || f.url || f.href || f.fileUrl || '',
+          fileName: f.fileName || f.name || f.fileTitle || f.title || f.productFileName || f.productFileTitle || '',
+          downloadUrl: f.fileDownloadUrl || f.downloadUrl || f.url || f.href || f.fileUrl || f.productFileUrl || f.productFileDownloadUrl || '',
         })).filter(f => f.downloadUrl);
         log(`Files with download URLs: ${result.length}`);
         return result;
@@ -157,13 +166,24 @@ async function getFileList(mode) {
       let files = data?.productFiles || data?.files || data?.bulkFiles || data?.results || [];
       if (!Array.isArray(files)) files = [];
 
+      // Check bulkDataProductBag — actual USPTO API response structure
+      if (!files.length && data?.bulkDataProductBag) {
+        const bag = Array.isArray(data.bulkDataProductBag) ? data.bulkDataProductBag : [data.bulkDataProductBag];
+        for (const product of bag) {
+          const pf = product?.productFileArray?.productFile || product?.productFiles || product?.files || [];
+          files.push(...(Array.isArray(pf) ? pf : [pf]));
+        }
+      }
+
       log(`Official API files: ${files.length}`);
-      log(`Official API sample: ${body.slice(0, 500)}`);
+      if (files.length > 0) log(`First file keys: ${Object.keys(files[0]).join(', ')}`);
+      if (files.length > 0) log(`First file: ${JSON.stringify(files[0]).slice(0, 300)}`);
+      log(`Official API sample: ${body.slice(0, 300)}`);
 
       if (files.length > 0) {
         return files.map(f => ({
           fileName: f.fileName || f.name || '',
-          downloadUrl: f.fileDownloadUrl || f.downloadUrl || f.url || '',
+          downloadUrl: f.fileDownloadUrl || f.downloadUrl || f.url || f.productFileUrl || f.productFileDownloadUrl || '',
         })).filter(f => f.downloadUrl);
       }
     }
