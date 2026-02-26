@@ -41,10 +41,81 @@ async function launchBrowser() {
   });
 }
 
+/**
+ * Generate plural/singular/common variations of a mark name.
+ * USPTO treats plural and singular forms as confusingly similar.
+ * e.g. LEVEL -> [LEVEL, LEVELS], LEVELS -> [LEVELS, LEVEL]
+ */
+function getMarkVariations(markName) {
+  const base = markName.trim().toUpperCase();
+  const variations = new Set([base]);
+
+  // Singular from plural: strip S or ES
+  if (base.endsWith('IES') && base.length > 4) {
+    variations.add(base.slice(0, -3) + 'Y');   // PARTIES -> PARTY
+  } else if (base.endsWith('ES') && base.length > 3) {
+    variations.add(base.slice(0, -2));           // BENCHES -> BENCH
+    variations.add(base.slice(0, -1));           // edge cases
+  } else if (base.endsWith('S') && base.length > 2) {
+    variations.add(base.slice(0, -1));           // LEVELS -> LEVEL
+  }
+
+  // Plural from singular
+  if (!base.endsWith('S')) {
+    variations.add(base + 'S');                  // LEVEL -> LEVELS
+    if (/[XZ]$/.test(base) || /CH$/.test(base) || /SH$/.test(base)) {
+      variations.add(base + 'ES');               // BUZZ -> BUZZES
+    }
+    if (base.endsWith('Y') && base.length > 1) {
+      variations.add(base.slice(0, -1) + 'IES'); // PARTY -> PARTIES
+    }
+  }
+
+  // ING strip/add for single words
+  if (base.endsWith('ING') && base.length > 4) {
+    variations.add(base.slice(0, -3));            // GLOWING -> GLOW
+    variations.add(base.slice(0, -3) + 'E');      // TRADING -> TRADE
+  } else if (!base.includes(' ') && base.length <= 8 && !base.endsWith('ING')) {
+    variations.add(base + 'ING');
+  }
+
+  return [...variations].filter(v => v.length >= 2);
+}
+
 async function scrapeUsptoTrademark(markName, classCode) {
   const browser = await launchBrowser();
-  const results = [];
+  const allResults = [];
+  const variations = getMarkVariations(markName);
 
+  console.log(`[scrape] Searching variations: ${variations.join(', ')}`);
+
+  try {
+    for (const variant of variations) {
+      const results = await scrapeVariant(browser, variant, classCode);
+      for (const r of results) {
+        r.matchedVariant = variant;
+        r.isVariation = variant !== markName.toUpperCase();
+      }
+      allResults.push(...results);
+    }
+  } finally {
+    await browser.close();
+  }
+
+  // Deduplicate by serial number
+  const seen = new Set();
+  const deduped = allResults.filter(r => {
+    if (seen.has(r.serialNumber)) return false;
+    seen.add(r.serialNumber);
+    return true;
+  });
+
+  console.log(`[scrape] Total unique results across all variations: ${deduped.length}`);
+  return deduped;
+}
+
+async function scrapeVariant(browser, markName, classCode) {
+  const results = [];
   try {
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(60000);
@@ -77,25 +148,17 @@ async function scrapeUsptoTrademark(markName, classCode) {
 
     await sleep(4000);
 
-    // If class filter provided, try to apply it
     if (classCode) {
       console.log('[scrape] Applying class filter:', classCode);
       try {
-        // Look for class/international class filter on results page
         const classApplied = await page.evaluate((cls) => {
-          // Try to find IC class filter checkboxes or inputs
-          const allText = document.body.innerText;
-          // Look for filter elements
           const inputs = Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'));
           const classInput = inputs.find(i => {
             const label = i.closest('label') || document.querySelector(`label[for="${i.id}"]`);
             const text = (label?.innerText || i.value || i.id || '').toLowerCase();
             return text.includes(cls) || text.includes(`class ${cls}`);
           });
-          if (classInput && !classInput.checked) {
-            classInput.click();
-            return true;
-          }
+          if (classInput && !classInput.checked) { classInput.click(); return true; }
           return false;
         }, classCode);
         console.log('[scrape] Class filter applied via UI:', classApplied);
@@ -105,11 +168,9 @@ async function scrapeUsptoTrademark(markName, classCode) {
       }
     }
 
-    // Wait for serial numbers to appear
     try {
       await page.waitForFunction(() => {
-        const body = document.body.innerText;
-        return body.match(/\b\d{8}\b/);
+        return document.body.innerText.match(/\b\d{8}\b/);
       }, { timeout: 10000 });
     } catch {
       console.log('[scrape] Timeout waiting for serial numbers');
@@ -118,14 +179,10 @@ async function scrapeUsptoTrademark(markName, classCode) {
     await sleep(2000);
 
     const fullText = await page.evaluate(() => document.body?.innerText || '');
-    console.log('[scrape] Page text (first 1000):', fullText.substring(0, 1000));
-
-    // Extract serial numbers with surrounding context
     const serialMatches = [...fullText.matchAll(/\b(\d{8})\b/g)].map(m => m[1]);
     const uniqueSerials = [...new Set(serialMatches)].slice(0, 50);
     console.log('[scrape] Serials found:', uniqueSerials.length);
 
-    // Try structured extraction first
     const rawData = await page.evaluate(() => {
       const items = [];
       const selectors = [
@@ -134,7 +191,6 @@ async function scrapeUsptoTrademark(markName, classCode) {
         'mat-list-item', 'mat-card',
         'tbody tr', '[role="listitem"]', '[role="row"]',
       ];
-
       for (const sel of selectors) {
         const els = document.querySelectorAll(sel);
         if (els.length > 1) {
@@ -154,10 +210,6 @@ async function scrapeUsptoTrademark(markName, classCode) {
 
     if (itemsWithSerials.length > 0) {
       for (const r of itemsWithSerials) {
-        // Filter by class if specified - check if class appears in the text
-        if (classCode && !r.text.includes(`IC 0${classCode.padStart(2,'0')}`) && !r.text.includes(`IC ${classCode}`) && !r.text.includes(`Class ${classCode}`)) {
-          // Don't strictly filter - USPTO search already filters
-        }
         results.push({
           source: 'tmsearch',
           serialNumber: r.serial,
@@ -189,11 +241,12 @@ async function scrapeUsptoTrademark(markName, classCode) {
     }
 
     await page.close();
-    console.log(`[scrape] Returning ${results.length} results`);
+    console.log(`[scrape] Variant "${markName}" returning ${results.length} results`);
     return results;
-
-  } finally {
-    await browser.close();
+  } catch (e) {
+    console.log(`[scrape] Variant "${markName}" failed:`, e.message);
+    try { } catch { }
+    return [];
   }
 }
 
@@ -201,7 +254,14 @@ async function callClaude({ markName, classCode, results }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
 
-  const classContext = classCode ? `The applicant is seeking registration in International Class ${classCode}.` : 'No specific class specified - analyze across all relevant classes.';
+  const classContext = classCode
+    ? `The applicant is seeking registration in International Class ${classCode}.`
+    : 'No specific class specified - analyze across all relevant classes.';
+
+  const variantCount = results.filter(r => r.isVariation).length;
+  const variantNote = variantCount > 0
+    ? `\nIMPORTANT: ${variantCount} result(s) were found by searching plural/variation forms of the mark. Under established USPTO practice and DuPont factors, plural and singular forms of a mark are treated as confusingly similar. Weight these results accordingly in your risk analysis.`
+    : '';
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -213,7 +273,7 @@ async function callClaude({ markName, classCode, results }) {
       system: 'You are a trademark clearance attorney assistant. Perform rigorous DuPont factor likelihood-of-confusion analysis. Return ONLY a raw JSON object. No markdown. No explanation.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for proposed mark: "${markName}".\n${classContext}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nPerform thorough DuPont analysis considering: similarity of marks, relatedness of goods/services, strength of mark, actual confusion evidence, channels of trade.\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high"}]}`
+        content: `Analyze trademark risk for proposed mark: "${markName}".\n${classContext}${variantNote}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nPerform thorough DuPont analysis considering: similarity of marks (including plural/singular variations which USPTO treats as confusingly similar), relatedness of goods/services, strength of mark, actual confusion evidence, channels of trade.\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high","isVariation":boolean}]}`
       }]
     })
   });
@@ -252,7 +312,6 @@ app.post('/api/analyze', async (req, res) => {
     return res.status(500).json({ error: 'Claude failed', message: String(e?.message || e) });
   }
 });
-// ADD THIS BLOCK to server.js just before the /health route
 
 app.post('/api/suggest', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
