@@ -22,7 +22,7 @@ async function initSchema() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS trademarks (
         serial_number   VARCHAR(20) PRIMARY KEY,
-        mark_name       TEXT,
+        mark_name       TEXT NOT NULL,
         owner           TEXT,
         status          VARCHAR(10),
         goods_services  TEXT,
@@ -32,14 +32,8 @@ async function initSchema() {
         updated_at      TIMESTAMP DEFAULT NOW()
       );
 
-      CREATE INDEX IF NOT EXISTS idx_trademarks_mark_name
-        ON trademarks USING gin(to_tsvector('english', COALESCE(mark_name, '')));
-
-      CREATE INDEX IF NOT EXISTS idx_trademarks_mark_name_lower
-        ON trademarks (lower(mark_name));
-
-      CREATE INDEX IF NOT EXISTS idx_trademarks_status
-        ON trademarks (status);
+      CREATE INDEX IF NOT EXISTS idx_tm_mark_lower ON trademarks (lower(mark_name));
+      CREATE INDEX IF NOT EXISTS idx_tm_status     ON trademarks (status);
 
       CREATE TABLE IF NOT EXISTS loader_log (
         id          SERIAL PRIMARY KEY,
@@ -47,6 +41,13 @@ async function initSchema() {
         status      VARCHAR(20),
         records_processed INTEGER DEFAULT 0,
         message     TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS loader_state (
+        product TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        processed_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (product, file_name)
       );
     `);
     console.log('[db] Schema ready');
@@ -61,18 +62,16 @@ async function initSchema() {
  */
 async function searchTrademarks(markName, classCode) {
   const name = markName.trim().toUpperCase();
-
-  // Build variations (same logic as before)
   const variations = getVariations(name);
+
   console.log(`[db] Searching for: ${variations.join(', ')}`);
 
-  // Build query with OR across all variations
-  const conditions = variations.map((_, i) => `lower(mark_name) = lower($${i + 1})`);
+  const exactConditions = variations.map((_, i) => `lower(mark_name) = lower($${i + 1})`);
   const likeConditions = [`lower(mark_name) LIKE lower($${variations.length + 1})`];
 
-  let params = [...variations, `${name}%`];
-  let classFilter = '';
+  const params = [...variations, `${name}%`];
 
+  let classFilter = '';
   if (classCode) {
     classFilter = ` AND (int_class LIKE $${params.length + 1} OR int_class IS NULL)`;
     params.push(`%${classCode}%`);
@@ -81,7 +80,7 @@ async function searchTrademarks(markName, classCode) {
   const query = `
     SELECT *
     FROM trademarks
-    WHERE (${[...conditions, ...likeConditions].join(' OR ')})
+    WHERE (${[...exactConditions, ...likeConditions].join(' OR ')})
     ${classFilter}
     ORDER BY
       CASE WHEN status = 'LIVE' THEN 0 ELSE 1 END,
@@ -101,8 +100,8 @@ async function searchTrademarks(markName, classCode) {
     internationalClass: r.int_class || null,
     filingDate: r.filing_date || null,
     registrationDate: r.reg_date || null,
-    isVariation: r.mark_name?.toUpperCase() !== name,
-    matchedVariant: r.mark_name?.toUpperCase(),
+    isVariation: (r.mark_name || '').toUpperCase() !== name,
+    matchedVariant: (r.mark_name || '').toUpperCase(),
   }));
 }
 
@@ -139,9 +138,7 @@ function getVariations(base) {
 
 async function getLoaderStatus() {
   try {
-    const result = await pool.query(
-      'SELECT * FROM loader_log ORDER BY run_date DESC LIMIT 5'
-    );
+    const result = await pool.query('SELECT * FROM loader_log ORDER BY run_date DESC LIMIT 5');
     return result.rows;
   } catch {
     return [];
