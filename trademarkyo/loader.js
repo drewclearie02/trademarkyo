@@ -22,7 +22,6 @@
 
 const https = require('https');
 const { Client } = require('pg');
-const unzipper = require('unzipper');
 const sax = require('sax');
 
 const PRODUCT = 'TRTDXFAP';
