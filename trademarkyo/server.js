@@ -3,10 +3,7 @@
 const path    = require('path');
 const express = require('express');
 const cors    = require('cors');
-const { spawn } = require('child_process');
-
-const { initSchema, searchTrademarks, getLoaderStatus, getTrademarkCount } = require('./db');
-const { startCron } = require('./cron');
+const https   = require('https');
 
 const app  = express();
 const PORT = Number(process.env.PORT || 8080);
@@ -28,6 +25,96 @@ function parseJson(text) {
   try { return JSON.parse(clean); } catch { return null; }
 }
 
+// ── MarkerAPI Search ──────────────────────────────────────────────────────────
+
+function markerApiGet(url) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'trademarkyo/2.0' } }, (res) => {
+      // Follow redirects
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return markerApiGet(res.headers.location).then(resolve).catch(reject);
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      res.on('error', reject);
+    });
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('MarkerAPI timeout')); });
+    req.on('error', reject);
+  });
+}
+
+function getVariations(name) {
+  const v = new Set([name]);
+  // Add wildcard variant for broader search
+  if (!name.includes('*')) v.add(name + '*');
+  // Plural/singular
+  if (name.endsWith('S') && name.length > 2) v.add(name.slice(0, -1));
+  if (!name.endsWith('S')) v.add(name + 'S');
+  return [...v];
+}
+
+async function searchMarkerAPI(markName, classCode) {
+  const username = process.env.MARKER_USERNAME || 'drewclearie2002';
+  const password = process.env.MARKER_PASSWORD;
+
+  if (!password) throw new Error('MARKER_PASSWORD env var not set');
+
+  const name = markName.trim().toUpperCase();
+  const encodedName = encodeURIComponent(name);
+
+  // Search both exact and wildcard, status "all" to get pending/live/dead
+  const url = `https://markerapi.com/api/v2/trademarks/trademark/${encodedName}/status/all/start/1/username/${username}/password/${password}`;
+
+  console.log(`[marker] Searching: "${name}"`);
+  const { status, body } = await markerApiGet(url);
+
+  if (status !== 200) {
+    throw new Error(`MarkerAPI returned HTTP ${status}: ${truncate(body, 200)}`);
+  }
+
+  const data = parseJson(body);
+  if (!data) throw new Error('MarkerAPI returned invalid JSON');
+
+  console.log(`[marker] count=${data.count}, trademarks=${(data.trademarks || []).length}`);
+
+  if (!data.trademarks || data.trademarks.length === 0) return [];
+
+  // Map MarkerAPI fields to our internal format
+  return data.trademarks.map(tm => {
+    const statusCode = String(tm.statuscode || '');
+    const statusLabel = String(tm.status || tm.statusdescription || '').toLowerCase();
+    const isDead = /dead|abandon|cancel|expire|withdrawn/i.test(statusLabel) ||
+                   ['600','601','602','603','604','700','710','800','810','820','900'].some(c => statusCode.startsWith(c));
+
+    // Check if this is the exact mark or a variation
+    const returnedMark = String(tm.wordmark || tm.trademark || '').toUpperCase();
+    const isVariation = returnedMark !== name;
+
+    return {
+      source: 'markerapi',
+      serialNumber: String(tm.serialnumber || ''),
+      markName: returnedMark,
+      owner: tm.owner || null,
+      liveDeadStatus: isDead ? 'DEAD' : 'LIVE',
+      goodsServices: tm.description || '',
+      internationalClass: tm.gscode ? String(tm.gscode) : (classCode || null),
+      filingDate: tm.filingdate || null,
+      registrationDate: tm.registrationdate || null,
+      statusDescription: tm.statusdescription || tm.status || null,
+      isVariation,
+      matchedVariant: returnedMark,
+    };
+  }).filter(r => {
+    // If classCode specified, filter to matching class (loose match)
+    if (!classCode) return true;
+    if (!r.internationalClass) return true;
+    return r.internationalClass.includes(classCode);
+  });
+}
+
+// ── Claude Analysis ───────────────────────────────────────────────────────────
+
 async function callClaude({ markName, classCode, results }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
@@ -38,7 +125,7 @@ async function callClaude({ markName, classCode, results }) {
 
   const variantCount = results.filter(r => r.isVariation).length;
   const variantNote = variantCount > 0
-    ? `\nIMPORTANT: ${variantCount} result(s) matched via plural/variation search. Under USPTO practice, plural and singular forms are confusingly similar.`
+    ? `\nIMPORTANT: ${variantCount} result(s) are plural/variation matches. Under USPTO practice, plural and singular forms are confusingly similar.`
     : '';
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -55,7 +142,7 @@ async function callClaude({ markName, classCode, results }) {
       system: 'You are a trademark clearance attorney assistant. Perform rigorous USPTO analysis. Return ONLY a raw JSON object — no markdown, no explanation.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for: "${markName}".\n${classCtx}${variantNote}\n\nUSPTO database records (${results.length}):\n${JSON.stringify(results.slice(0, 30), null, 2)}\n\nAnalyze all USPTO rejection grounds:\n1. Likelihood of Confusion (Sec 2(d)) — DuPont factors\n2. Merely Descriptive (Sec 2(e)(1))\n3. Generic\n4. Geographic Descriptiveness (Sec 2(e)(2))\n5. Primarily a Surname (Sec 2(e)(4))\n6. Ornamental Use\n7. Deceptive Matter (Sec 2(a))\n\nReturn ONLY:\n{\n  "approvalScore": 0-100,\n  "verdict": "approve"|"caution"|"reject",\n  "distinctiveness": "string",\n  "mainRisks": ["string"],\n  "recommendation": "string",\n  "rejectionGrounds": {\n    "likelihoodOfConfusion": { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "merelyDescriptive":    { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "generic":              { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "geographicDescriptiveness": { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "primarilyASurname":    { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "ornamental":           { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "deceptiveMatter":      { "risk": "none"|"low"|"medium"|"high", "explanation": "string" }\n  },\n  "conflictAnalysis": [\n    { "serialNumber": "string|null", "markName": "string|null", "status": "string|null",\n      "similarity": "string", "goodsServicesOverlap": "string",\n      "riskLevel": "low"|"medium"|"high", "isVariation": false }\n  ]\n}`
+        content: `Analyze trademark risk for: "${markName}".\n${classCtx}${variantNote}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results.slice(0, 30), null, 2)}\n\nAnalyze all USPTO rejection grounds:\n1. Likelihood of Confusion (Sec 2(d)) — DuPont factors\n2. Merely Descriptive (Sec 2(e)(1))\n3. Generic\n4. Geographic Descriptiveness (Sec 2(e)(2))\n5. Primarily a Surname (Sec 2(e)(4))\n6. Ornamental Use\n7. Deceptive Matter (Sec 2(a))\n\nReturn ONLY:\n{\n  "approvalScore": 0-100,\n  "verdict": "approve"|"caution"|"reject",\n  "distinctiveness": "string",\n  "mainRisks": ["string"],\n  "recommendation": "string",\n  "rejectionGrounds": {\n    "likelihoodOfConfusion": { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "merelyDescriptive":    { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "generic":              { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "geographicDescriptiveness": { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "primarilyASurname":    { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "ornamental":           { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "deceptiveMatter":      { "risk": "none"|"low"|"medium"|"high", "explanation": "string" }\n  },\n  "conflictAnalysis": [\n    { "serialNumber": "string|null", "markName": "string|null", "status": "string|null",\n      "similarity": "string", "goodsServicesOverlap": "string",\n      "riskLevel": "low"|"medium"|"high", "isVariation": false }\n  ]\n}`
       }]
     }),
   });
@@ -78,16 +165,20 @@ app.post('/api/search', async (req, res) => {
   if (!markName) return res.status(400).json({ error: 'markName required' });
 
   try {
-    const results = await searchTrademarks(markName, classCode);
+    const results = await searchMarkerAPI(markName, classCode);
     console.log(`[search] "${markName}" → ${results.length} results`);
     return res.json({
-      mode: results.length > 0 ? 'postgresql' : 'ai_only',
+      mode: results.length > 0 ? 'markerapi' : 'ai_only',
       results,
-      meta: { markName, classCode, source: 'USPTO PostgreSQL database' },
+      meta: { markName, classCode, source: 'MarkerAPI / USPTO' },
     });
   } catch (e) {
     console.error('[search] Error:', e.message);
-    return res.json({ mode: 'ai_only', results: [], meta: { markName, classCode, error: e.message } });
+    return res.json({
+      mode: 'ai_only',
+      results: [],
+      meta: { markName, classCode, error: e.message },
+    });
   }
 });
 
@@ -139,67 +230,24 @@ app.post('/api/suggest', async (req, res) => {
     if (!resp.ok) throw new Error(`Claude API (${resp.status})`);
     const outer = JSON.parse(text);
     const raw = outer?.content?.[0]?.text || '';
-    const result = parseJson(raw);
-    return res.json(result);
+    return res.json(parseJson(raw));
   } catch (e) {
     return res.status(500).json({ error: 'Suggestion failed', message: String(e?.message || e) });
   }
 });
 
-app.get('/api/db-status', async (_req, res) => {
-  try {
-    const count = await getTrademarkCount();
-    const logs  = await getLoaderStatus();
-    return res.json({ trademarkCount: count, recentRuns: logs });
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
-  }
+// Kept for backwards compatibility — just returns API status now
+app.get('/api/db-status', (_req, res) => {
+  return res.json({
+    source: 'MarkerAPI',
+    status: 'live',
+    message: 'Search is powered by MarkerAPI (real-time USPTO data). No local database required.',
+  });
 });
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// ── Startup ───────────────────────────────────────────────────────────────────
+// ── Start ─────────────────────────────────────────────────────────────────────
 
-function spawnLoader(mode) {
-  const child = spawn(process.execPath, ['loader.js', mode], {
-    cwd: __dirname,
-    env: process.env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: false,
-  });
-  child.stdout.on('data', d => console.log(`[loader] ${String(d).trimEnd()}`));
-  child.stderr.on('data', d => console.error(`[loader] ${String(d).trimEnd()}`));
-  child.on('exit', code => console.log(`[startup] Loader exited code=${code}`));
-  console.log(`[startup] Loader spawned pid=${child.pid} mode=${mode}`);
-}
-
-async function start() {
-  // Bind port FIRST — Railway health check needs this immediately
-  app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
-
-  // Init DB schema
-  try {
-    await initSchema();
-  } catch (e) {
-    console.error('[startup] DB schema error:', e.message);
-  }
-
-  // Start daily cron
-  startCron();
-
-  // Auto-seed if DB is empty
-  try {
-    const count = await getTrademarkCount();
-    if (count === 0) {
-      console.log('[startup] Database empty — spawning background loader (full)...');
-      spawnLoader('full');
-    } else {
-      console.log(`[startup] Database has ${count} records — ready`);
-    }
-  } catch (e) {
-    console.error('[startup] Auto-seed check failed:', e.message);
-  }
-}
-
-start();
+app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
