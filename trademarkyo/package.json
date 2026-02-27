@@ -1,21 +1,14 @@
 {
   "name": "trademarkyo",
-  "version": "2.0.0",
-  "description": "USPTO Trademark Clearance Scanner",
+  "version": "3.0.0",
+  "description": "USPTO Trademark Clearance Scanner — powered by MarkerAPI",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "load": "node loader.js daily",
-    "load:full": "node loader.js full",
-    "load:daily": "node loader.js daily"
+    "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.18.2",
-    "node-cron": "^3.0.3",
-    "pg": "^8.11.3",
-    "sax": "^1.3.0",
-    "unzipper": "^0.10.14"
+    "express": "^4.18.2"
   },
   "engines": {
     "node": ">=18"
