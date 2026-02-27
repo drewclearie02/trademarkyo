@@ -3,7 +3,6 @@
 const path    = require('path');
 const express = require('express');
 const cors    = require('cors');
-const https   = require('https');
 
 const app  = express();
 const PORT = Number(process.env.PORT || 8080);
@@ -27,21 +26,19 @@ function parseJson(text) {
 
 // ── MarkerAPI Search ──────────────────────────────────────────────────────────
 
-function markerApiGet(url) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'trademarkyo/2.0' } }, (res) => {
-      // Follow redirects
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return markerApiGet(res.headers.location).then(resolve).catch(reject);
-      }
-      const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
-      res.on('error', reject);
+async function markerApiGet(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'trademarkyo/2.0' },
     });
-    req.setTimeout(15000, () => { req.destroy(); reject(new Error('MarkerAPI timeout')); });
-    req.on('error', reject);
-  });
+    const body = await res.text();
+    return { status: res.status, body };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function getVariations(name) {
