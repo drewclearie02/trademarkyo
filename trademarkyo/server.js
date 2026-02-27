@@ -61,7 +61,7 @@ async function searchMarkerAPI(markName, classCode) {
   const encodedName = encodeURIComponent(name);
 
   // Search both exact and wildcard, status "all" to get pending/live/dead
-  const url = `https://markerapi.com/api/v2/trademarks/trademark/${encodedName}/status/all/start/1/username/${username}/password/${password}`;
+  const url = `https://dev.markerapi.com/api/v2/trademarks/trademark/${encodedName}/status/all/start/1/username/${username}/password/${password}`;
 
   console.log(`[marker] Searching: "${name}"`);
   const { status, body } = await markerApiGet(url);
