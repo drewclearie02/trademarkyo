@@ -11,8 +11,6 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function truncate(s, n) {
   const str = String(s || '');
   return str.length > n ? str.slice(0, n - 1) + '…' : str;
@@ -24,93 +22,102 @@ function parseJson(text) {
   try { return JSON.parse(clean); } catch { return null; }
 }
 
-// ── MarkerAPI Search ──────────────────────────────────────────────────────────
+async function searchUSPTO(markName, classCode) {
+  const name = markName.trim().toLowerCase();
 
-async function markerApiGet(url) {
+  const body = {
+    query: {
+      bool: {
+        must: [{
+          bool: {
+            should: [
+              { match_phrase: { WM: { query: name, boost: 5 } } },
+              { match: { WM: { query: name, boost: 2 } } },
+              { match_phrase: { PM: { query: name, boost: 2 } } }
+            ]
+          }
+        }]
+      }
+    },
+    size: 100,
+    from: 0,
+    track_total_hits: true,
+    _source: [
+      'abandonDate','alive','attorney','cancelDate','coordinatedClass',
+      'currentBasis','designCodeDescription','disclaimer','drawingCode',
+      'filedDate','goodsAndServices','id','internationalClass',
+      'markDescription','markType','originalBasis','ownerFullText',
+      'ownerName','ownerType','priorityDate','publishForOppositionDate',
+      'registrationDate','registrationId','registrationType',
+      'supplementalRegistrationDate','translation','usClass',
+      'wordmark','wordmarkPseudoText'
+    ],
+    aggs: {
+      alive: { terms: { field: 'alive' } },
+      cancelDate: { value_count: { field: 'cancelDate' } }
+    }
+  };
+
+  if (classCode) {
+    body.query.bool.must.push({ match: { internationalClass: classCode } });
+  }
+
+  console.log(`[uspto] Searching: "${name}"`);
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 20000);
+
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'trademarkyo/2.0' },
+    const resp = await fetch(
+      'https://tmsearch.uspto.gov/api/search/prod-stage-v1-0-0/tmsearch',
+      {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Origin': 'https://tmsearch.uspto.gov',
+          'Referer': 'https://tmsearch.uspto.gov/search/search-results',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    const text = await resp.text();
+    if (!resp.ok) throw new Error(`USPTO API returned ${resp.status}: ${truncate(text, 200)}`);
+
+    const data = parseJson(text);
+    if (!data) throw new Error('USPTO API returned invalid JSON');
+
+    const hits = data?.hits?.hits || [];
+    console.log(`[uspto] total=${data?.hits?.total?.value}, returned=${hits.length}`);
+
+    return hits.map(hit => {
+      const s = hit._source || {};
+      const alive = s.alive === true || s.alive === 'true' || s.alive === 1;
+      return {
+        source: 'uspto',
+        serialNumber: s.id || hit._id || null,
+        markName: (s.wordmark || s.wordmarkPseudoText || '').toUpperCase(),
+        owner: s.ownerName || s.ownerFullText || null,
+        liveDeadStatus: alive ? 'LIVE' : 'DEAD',
+        goodsServices: Array.isArray(s.goodsAndServices) ? s.goodsAndServices.join('; ') : (s.goodsAndServices || ''),
+        internationalClass: Array.isArray(s.internationalClass) ? s.internationalClass.join(', ') : (s.internationalClass || null),
+        filingDate: s.filedDate || null,
+        registrationDate: s.registrationDate || null,
+        registrationId: s.registrationId || null,
+        markType: s.markType || null,
+        statusDescription: alive ? 'LIVE' : 'DEAD',
+        isVariation: (s.wordmark || '').toLowerCase() !== name,
+        matchedVariant: (s.wordmark || '').toUpperCase(),
+      };
     });
-    const body = await res.text();
-    return { status: res.status, body };
+
   } finally {
     clearTimeout(timer);
   }
 }
-
-function getVariations(name) {
-  const v = new Set([name]);
-  // Add wildcard variant for broader search
-  if (!name.includes('*')) v.add(name + '*');
-  // Plural/singular
-  if (name.endsWith('S') && name.length > 2) v.add(name.slice(0, -1));
-  if (!name.endsWith('S')) v.add(name + 'S');
-  return [...v];
-}
-
-async function searchMarkerAPI(markName, classCode) {
-  const username = process.env.MARKER_USERNAME || 'drewclearie2002';
-  const password = process.env.MARKER_PASSWORD;
-
-  if (!password) throw new Error('MARKER_PASSWORD env var not set');
-
-  const name = markName.trim().toUpperCase();
-  const encodedName = encodeURIComponent(name);
-
-  // Search both exact and wildcard, status "all" to get pending/live/dead
-  const url = `https://dev.markerapi.com/api/v2/trademarks/trademark/${encodedName}/status/all/start/1/username/${username}/password/${password}`;
-
-  console.log(`[marker] Searching: "${name}"`);
-  const { status, body } = await markerApiGet(url);
-
-  if (status !== 200) {
-    throw new Error(`MarkerAPI returned HTTP ${status}: ${truncate(body, 200)}`);
-  }
-
-  const data = parseJson(body);
-  if (!data) throw new Error('MarkerAPI returned invalid JSON');
-
-  console.log(`[marker] count=${data.count}, trademarks=${(data.trademarks || []).length}`);
-
-  if (!data.trademarks || data.trademarks.length === 0) return [];
-
-  // Map MarkerAPI fields to our internal format
-  return data.trademarks.map(tm => {
-    const statusCode = String(tm.statuscode || '');
-    const statusLabel = String(tm.status || tm.statusdescription || '').toLowerCase();
-    const isDead = /dead|abandon|cancel|expire|withdrawn/i.test(statusLabel) ||
-                   ['600','601','602','603','604','700','710','800','810','820','900'].some(c => statusCode.startsWith(c));
-
-    // Check if this is the exact mark or a variation
-    const returnedMark = String(tm.wordmark || tm.trademark || '').toUpperCase();
-    const isVariation = returnedMark !== name;
-
-    return {
-      source: 'markerapi',
-      serialNumber: String(tm.serialnumber || ''),
-      markName: returnedMark,
-      owner: tm.owner || null,
-      liveDeadStatus: isDead ? 'DEAD' : 'LIVE',
-      goodsServices: tm.description || '',
-      internationalClass: tm.gscode ? String(tm.gscode) : (classCode || null),
-      filingDate: tm.filingdate || null,
-      registrationDate: tm.registrationdate || null,
-      statusDescription: tm.statusdescription || tm.status || null,
-      isVariation,
-      matchedVariant: returnedMark,
-    };
-  }).filter(r => {
-    // If classCode specified, filter to matching class (loose match)
-    if (!classCode) return true;
-    if (!r.internationalClass) return true;
-    return r.internationalClass.includes(classCode);
-  });
-}
-
-// ── Claude Analysis ───────────────────────────────────────────────────────────
 
 async function callClaude({ markName, classCode, results }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -154,28 +161,22 @@ async function callClaude({ markName, classCode, results }) {
   return result;
 }
 
-// ── Routes ────────────────────────────────────────────────────────────────────
-
 app.post('/api/search', async (req, res) => {
   const markName  = String(req.body?.markName  || '').trim();
   const classCode = String(req.body?.classCode || '').trim();
   if (!markName) return res.status(400).json({ error: 'markName required' });
 
   try {
-    const results = await searchMarkerAPI(markName, classCode);
+    const results = await searchUSPTO(markName, classCode);
     console.log(`[search] "${markName}" → ${results.length} results`);
     return res.json({
-      mode: results.length > 0 ? 'markerapi' : 'ai_only',
+      mode: results.length > 0 ? 'uspto' : 'ai_only',
       results,
-      meta: { markName, classCode, source: 'MarkerAPI / USPTO' },
+      meta: { markName, classCode, source: 'USPTO tmsearch' },
     });
   } catch (e) {
     console.error('[search] Error:', e.message);
-    return res.json({
-      mode: 'ai_only',
-      results: [],
-      meta: { markName, classCode, error: e.message },
-    });
+    return res.json({ mode: 'ai_only', results: [], meta: { markName, classCode, error: e.message } });
   }
 });
 
@@ -233,18 +234,8 @@ app.post('/api/suggest', async (req, res) => {
   }
 });
 
-// Kept for backwards compatibility — just returns API status now
-app.get('/api/db-status', (_req, res) => {
-  return res.json({
-    source: 'MarkerAPI',
-    status: 'live',
-    message: 'Search is powered by MarkerAPI (real-time USPTO data). No local database required.',
-  });
-});
-
+app.get('/api/db-status', (_req, res) => res.json({ source: 'USPTO tmsearch', status: 'live' }));
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-
-// ── Start ─────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
