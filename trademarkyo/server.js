@@ -1,191 +1,322 @@
 'use strict';
 
-const path    = require('path');
+const path = require('path');
+const fs = require('fs');
 const express = require('express');
-const cors    = require('cors');
+const cors = require('cors');
+const puppeteer = require('puppeteer-core');
 
-const app  = express();
-const PORT = Number(process.env.PORT || 8080);
-
+const app = express();
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-function truncate(s, n) {
-  const str = String(s || '');
-  return str.length > n ? str.slice(0, n - 1) + '…' : str;
-}
+const PORT = Number(process.env.PORT || 8080);
 
-function parseJson(text) {
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function truncate(s, n) { const str = String(s || ''); return str.length > n ? str.slice(0, n - 1) + '…' : str; }
+
+function safeJsonParse(text) {
   if (!text) return null;
-  const clean = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-  try { return JSON.parse(clean); } catch { return null; }
+  const cleaned = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+  try { return JSON.parse(cleaned); } catch { return null; }
 }
 
-async function searchUSPTO(markName, classCode) {
-  const name = markName.trim().toLowerCase();
+function findChrome() {
+  const env = process.env.CHROME_PATH;
+  if (env && fs.existsSync(env)) return env;
+  for (const p of ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']) {
+    if (fs.existsSync(p)) return p;
+  }
+  throw new Error('Chrome not found');
+}
 
-  const body = {
-    query: {
-      bool: {
-        must: [{
-          bool: {
-            should: [
-              { match_phrase: { WM: { query: name, boost: 5 } } },
-              { match: { WM: { query: name, boost: 2 } } },
-              { match_phrase: { PM: { query: name, boost: 2 } } }
-            ]
-          }
-        }]
-      }
-    },
-    size: 100,
-    from: 0,
-    track_total_hits: true,
-    _source: [
-      'abandonDate','alive','attorney','cancelDate','coordinatedClass',
-      'currentBasis','designCodeDescription','disclaimer','drawingCode',
-      'filedDate','goodsAndServices','id','internationalClass',
-      'markDescription','markType','originalBasis','ownerFullText',
-      'ownerName','ownerType','priorityDate','publishForOppositionDate',
-      'registrationDate','registrationId','registrationType',
-      'supplementalRegistrationDate','translation','usClass',
-      'wordmark','wordmarkPseudoText'
-    ],
-    aggs: {
-      alive: { terms: { field: 'alive' } },
-      cancelDate: { value_count: { field: 'cancelDate' } }
+// ── Persistent browser instance ───────────────────────────────────────────────
+let browserInstance = null;
+let browserLaunching = false;
+
+async function getBrowser() {
+  if (browserInstance) {
+    try {
+      // Check it's still alive
+      await browserInstance.version();
+      return browserInstance;
+    } catch {
+      browserInstance = null;
     }
-  };
+  }
+  if (browserLaunching) {
+    // Wait for the in-progress launch
+    while (browserLaunching) await sleep(200);
+    return browserInstance;
+  }
+  browserLaunching = true;
+  try {
+    const executablePath = findChrome();
+    console.log('[browser] Launching Chrome:', executablePath);
+    browserInstance = await puppeteer.launch({
+      executablePath,
+      headless: true,
+      args: [
+        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+        '--disable-gpu', '--no-zygote', '--single-process',
+        '--disable-extensions', '--disable-background-networking',
+      ],
+    });
+    browserInstance.on('disconnected', () => {
+      console.log('[browser] Disconnected — will relaunch on next request');
+      browserInstance = null;
+    });
+    console.log('[browser] Chrome ready');
+    return browserInstance;
+  } finally {
+    browserLaunching = false;
+  }
+}
 
-  if (classCode) {
-    body.query.bool.must.push({ match: { internationalClass: classCode } });
+function getMarkVariations(markName) {
+  const base = markName.trim().toUpperCase();
+  const variations = new Set([base]);
+
+  if (base.endsWith('IES') && base.length > 4) {
+    variations.add(base.slice(0, -3) + 'Y');
+  } else if (base.endsWith('ES') && base.length > 3) {
+    variations.add(base.slice(0, -2));
+  } else if (base.endsWith('S') && base.length > 2) {
+    variations.add(base.slice(0, -1));
   }
 
-  console.log(`[uspto] Searching: "${name}"`);
+  if (!base.endsWith('S')) {
+    variations.add(base + 'S');
+    if (/[XZ]$/.test(base) || /CH$/.test(base) || /SH$/.test(base)) variations.add(base + 'ES');
+    if (base.endsWith('Y') && base.length > 1) variations.add(base.slice(0, -1) + 'IES');
+  }
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  if (base.endsWith('ING') && base.length > 4) {
+    variations.add(base.slice(0, -3));
+    variations.add(base.slice(0, -3) + 'E');
+  } else if (!base.includes(' ') && base.length <= 8 && !base.endsWith('ING')) {
+    variations.add(base + 'ING');
+  }
 
+  return [...variations].filter(v => v.length >= 2);
+}
+
+async function scrapeVariant(browser, markName, classCode) {
+  const results = [];
+  let page;
   try {
-    const resp = await fetch(
-      'https://tmsearch.uspto.gov/api/search/prod-stage-v1-0-0/tmsearch',
-      {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': 'https://tmsearch.uspto.gov',
-          'Referer': 'https://tmsearch.uspto.gov/search/search-results',
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36',
-        },
-        body: JSON.stringify(body),
+    page = await browser.newPage();
+    page.setDefaultNavigationTimeout(60000);
+    page.setDefaultTimeout(60000);
+    await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
+
+    await page.goto('https://tmsearch.uspto.gov/search/search-information', {
+      waitUntil: 'networkidle2', timeout: 45000
+    });
+    await sleep(2000);
+
+    await page.waitForSelector('#searchbar', { timeout: 10000 });
+    await page.click('#searchbar');
+    await page.keyboard.down('Control');
+    await page.keyboard.press('a');
+    await page.keyboard.up('Control');
+    await page.type('#searchbar', markName.toUpperCase(), { delay: 50 });
+    console.log('[scrape] Typed mark:', markName.toUpperCase());
+
+    const btnClicked = await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll('button, mat-icon'));
+      const searchBtn = btns.find(b => (b.textContent || '').trim().toLowerCase() === 'search');
+      if (searchBtn) { searchBtn.click(); return true; }
+      const inputParent = document.querySelector('#searchbar')?.closest('form, mat-form-field, div');
+      const btn = inputParent?.querySelector('button');
+      if (btn) { btn.click(); return true; }
+      return false;
+    });
+    if (!btnClicked) await page.keyboard.press('Enter');
+
+    await sleep(4000);
+
+    if (classCode) {
+      try {
+        const classApplied = await page.evaluate((cls) => {
+          const inputs = Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'));
+          const classInput = inputs.find(i => {
+            const label = i.closest('label') || document.querySelector(`label[for="${i.id}"]`);
+            const text = (label?.innerText || i.value || i.id || '').toLowerCase();
+            return text.includes(cls) || text.includes(`class ${cls}`);
+          });
+          if (classInput && !classInput.checked) { classInput.click(); return true; }
+          return false;
+        }, classCode);
+        if (classApplied) await sleep(2000);
+      } catch (e) {
+        console.log('[scrape] Could not apply class filter:', e.message);
       }
-    );
+    }
 
-    const text = await resp.text();
-    if (!resp.ok) throw new Error(`USPTO API returned ${resp.status}: ${truncate(text, 200)}`);
+    try {
+      await page.waitForFunction(() => document.body.innerText.match(/\b\d{8}\b/), { timeout: 10000 });
+    } catch {
+      console.log('[scrape] Timeout waiting for serial numbers');
+    }
 
-    const data = parseJson(text);
-    if (!data) throw new Error('USPTO API returned invalid JSON');
+    await sleep(2000);
 
-    const hits = data?.hits?.hits || [];
-    console.log(`[uspto] total=${data?.hits?.total?.value}, returned=${hits.length}`);
+    const fullText = await page.evaluate(() => document.body?.innerText || '');
+    const serialMatches = [...fullText.matchAll(/\b(\d{8})\b/g)].map(m => m[1]);
+    const uniqueSerials = [...new Set(serialMatches)].slice(0, 50);
+    console.log('[scrape] Serials found:', uniqueSerials.length);
 
-    return hits.map(hit => {
-      const s = hit._source || {};
-      const alive = s.alive === true || s.alive === 'true' || s.alive === 1;
-      return {
-        source: 'uspto',
-        serialNumber: s.id || hit._id || null,
-        markName: (s.wordmark || s.wordmarkPseudoText || '').toUpperCase(),
-        owner: s.ownerName || s.ownerFullText || null,
-        liveDeadStatus: alive ? 'LIVE' : 'DEAD',
-        goodsServices: Array.isArray(s.goodsAndServices) ? s.goodsAndServices.join('; ') : (s.goodsAndServices || ''),
-        internationalClass: Array.isArray(s.internationalClass) ? s.internationalClass.join(', ') : (s.internationalClass || null),
-        filingDate: s.filedDate || null,
-        registrationDate: s.registrationDate || null,
-        registrationId: s.registrationId || null,
-        markType: s.markType || null,
-        statusDescription: alive ? 'LIVE' : 'DEAD',
-        isVariation: (s.wordmark || '').toLowerCase() !== name,
-        matchedVariant: (s.wordmark || '').toUpperCase(),
-      };
+    const rawData = await page.evaluate(() => {
+      const items = [];
+      const selectors = [
+        'app-result-item', 'app-search-result', 'app-trademark-result',
+        '[class*="result-item"]', '[class*="search-result"]',
+        'mat-list-item', 'mat-card', 'tbody tr', '[role="listitem"]', '[role="row"]',
+      ];
+      for (const sel of selectors) {
+        const els = document.querySelectorAll(sel);
+        if (els.length > 1) {
+          els.forEach(el => {
+            const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (text.length < 5) return;
+            const serial = text.match(/\b(\d{8})\b/)?.[1];
+            items.push({ text: text.substring(0, 500), serial: serial || null });
+          });
+          if (items.length > 2) break;
+        }
+      }
+      return items.slice(0, 50);
     });
 
+    const itemsWithSerials = rawData.filter(r => r.serial);
+
+    if (itemsWithSerials.length > 0) {
+      for (const r of itemsWithSerials) {
+        results.push({
+          source: 'tmsearch',
+          serialNumber: r.serial,
+          liveDeadStatus: /dead|abandon|cancel/i.test(r.text) ? 'DEAD' : 'LIVE',
+          markName: null,
+          owner: null,
+          goodsServices: r.text,
+          internationalClass: classCode || null,
+          filingDate: null,
+          registrationDate: null,
+        });
+      }
+    } else if (uniqueSerials.length > 0) {
+      for (const serial of uniqueSerials) {
+        const idx = fullText.indexOf(serial);
+        const context = fullText.substring(Math.max(0, idx - 100), idx + 300);
+        results.push({
+          source: 'tmsearch',
+          serialNumber: serial,
+          liveDeadStatus: /dead|abandon|cancel/i.test(context) ? 'DEAD' : 'LIVE',
+          markName: null,
+          owner: null,
+          goodsServices: context.replace(/\s+/g, ' ').trim(),
+          internationalClass: classCode || null,
+          filingDate: null,
+          registrationDate: null,
+        });
+      }
+    }
+
+    console.log(`[scrape] Variant "${markName}" returning ${results.length} results`);
+    return results;
+  } catch (e) {
+    console.log(`[scrape] Variant "${markName}" failed:`, e.message);
+    return [];
   } finally {
-    clearTimeout(timer);
+    if (page) await page.close().catch(() => {});
   }
+}
+
+async function scrapeUsptoTrademark(markName, classCode) {
+  const browser = await getBrowser();
+  const allResults = [];
+  const variations = getMarkVariations(markName);
+
+  console.log(`[scrape] Searching variations: ${variations.join(', ')}`);
+
+  for (const variant of variations) {
+    const results = await scrapeVariant(browser, variant, classCode);
+    for (const r of results) {
+      r.matchedVariant = variant;
+      r.isVariation = variant !== markName.toUpperCase();
+    }
+    allResults.push(...results);
+  }
+
+  // Deduplicate by serial number
+  const seen = new Set();
+  const deduped = allResults.filter(r => {
+    if (seen.has(r.serialNumber)) return false;
+    seen.add(r.serialNumber);
+    return true;
+  });
+
+  console.log(`[scrape] Total unique results: ${deduped.length}`);
+  return deduped;
 }
 
 async function callClaude({ markName, classCode, results }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
 
-  const classCtx = classCode
-    ? `The applicant seeks registration in International Class ${classCode}.`
-    : 'No specific class — analyze across all relevant classes.';
+  const classContext = classCode
+    ? `The applicant is seeking registration in International Class ${classCode}.`
+    : 'No specific class specified - analyze across all relevant classes.';
 
   const variantCount = results.filter(r => r.isVariation).length;
   const variantNote = variantCount > 0
-    ? `\nIMPORTANT: ${variantCount} result(s) are plural/variation matches. Under USPTO practice, plural and singular forms are confusingly similar.`
+    ? `\nIMPORTANT: ${variantCount} result(s) were found by searching plural/variation forms of the mark. Under established USPTO practice and DuPont factors, plural and singular forms of a mark are treated as confusingly similar. Weight these results accordingly.`
     : '';
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 1500,
       temperature: 0.2,
-      system: 'You are a trademark clearance attorney assistant. Perform rigorous USPTO analysis. Return ONLY a raw JSON object — no markdown, no explanation.',
+      system: 'You are a trademark clearance attorney assistant. Perform rigorous DuPont factor likelihood-of-confusion analysis. Return ONLY a raw JSON object. No markdown. No explanation.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for: "${markName}".\n${classCtx}${variantNote}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results.slice(0, 30), null, 2)}\n\nAnalyze all USPTO rejection grounds:\n1. Likelihood of Confusion (Sec 2(d)) — DuPont factors\n2. Merely Descriptive (Sec 2(e)(1))\n3. Generic\n4. Geographic Descriptiveness (Sec 2(e)(2))\n5. Primarily a Surname (Sec 2(e)(4))\n6. Ornamental Use\n7. Deceptive Matter (Sec 2(a))\n\nReturn ONLY:\n{\n  "approvalScore": 0-100,\n  "verdict": "approve"|"caution"|"reject",\n  "distinctiveness": "string",\n  "mainRisks": ["string"],\n  "recommendation": "string",\n  "rejectionGrounds": {\n    "likelihoodOfConfusion": { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "merelyDescriptive":    { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "generic":              { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "geographicDescriptiveness": { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "primarilyASurname":    { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "ornamental":           { "risk": "none"|"low"|"medium"|"high", "explanation": "string" },\n    "deceptiveMatter":      { "risk": "none"|"low"|"medium"|"high", "explanation": "string" }\n  },\n  "conflictAnalysis": [\n    { "serialNumber": "string|null", "markName": "string|null", "status": "string|null",\n      "similarity": "string", "goodsServicesOverlap": "string",\n      "riskLevel": "low"|"medium"|"high", "isVariation": false }\n  ]\n}`
+        content: `Analyze trademark risk for proposed mark: "${markName}".\n${classContext}${variantNote}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high","isVariation":boolean}]}`
       }]
-    }),
+    })
   });
 
   const text = await resp.text();
   if (!resp.ok) throw new Error(`Claude API (${resp.status}): ${truncate(text, 250)}`);
-
-  const outer = parseJson(text);
-  const raw = outer?.content?.[0]?.text || '';
-  const result = parseJson(raw);
+  const parsed = safeJsonParse(text);
+  const rawContent = parsed?.content?.[0]?.text || '';
+  const result = safeJsonParse(rawContent);
   if (!result) throw new Error('Claude returned invalid JSON');
   return result;
 }
 
 app.post('/api/search', async (req, res) => {
-  const markName  = String(req.body?.markName  || '').trim();
+  const markName = String(req.body?.markName || '').trim();
   const classCode = String(req.body?.classCode || '').trim();
   if (!markName) return res.status(400).json({ error: 'markName required' });
-
   try {
-    const results = await searchUSPTO(markName, classCode);
-    console.log(`[search] "${markName}" → ${results.length} results`);
-    return res.json({
-      mode: results.length > 0 ? 'uspto' : 'ai_only',
-      results,
-      meta: { markName, classCode, source: 'USPTO tmsearch' },
-    });
+    const results = await scrapeUsptoTrademark(markName, classCode);
+    return res.json({ mode: results.length > 0 ? 'tess_scrape' : 'ai_only', results, meta: { markName, classCode } });
   } catch (e) {
-    console.error('[search] Error:', e.message);
+    console.error('[search] Failed:', e.message);
     return res.json({ mode: 'ai_only', results: [], meta: { markName, classCode, error: e.message } });
   }
 });
 
 app.post('/api/analyze', async (req, res) => {
-  const markName  = String(req.body?.markName  || '').trim();
+  const markName = String(req.body?.markName || '').trim();
   const classCode = String(req.body?.classCode || '').trim();
-  const results   = Array.isArray(req.body?.results) ? req.body.results : [];
+  const results = Array.isArray(req.body?.results) ? req.body.results : [];
   if (!markName) return res.status(400).json({ error: 'markName required' });
-
   try {
     return res.json(await callClaude({ markName, classCode, results }));
   } catch (e) {
@@ -194,10 +325,10 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 app.post('/api/suggest', async (req, res) => {
-  const markName  = String(req.body?.markName  || '').trim();
+  const markName = String(req.body?.markName || '').trim();
   const classCode = String(req.body?.classCode || '').trim();
-  const score     = Number(req.body?.score     || 0);
-  const risks     = String(req.body?.risks     || '');
+  const score = Number(req.body?.score || 0);
+  const risks = String(req.body?.risks || '');
   const conflicts = String(req.body?.conflicts || '');
   if (!markName) return res.status(400).json({ error: 'markName required' });
 
@@ -207,11 +338,7 @@ app.post('/api/suggest', async (req, res) => {
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 800,
@@ -219,23 +346,31 @@ app.post('/api/suggest', async (req, res) => {
         system: 'You are a creative trademark attorney and brand naming expert. Return ONLY a raw JSON object. No markdown.',
         messages: [{
           role: 'user',
-          content: `Proposed mark "${markName}" scored ${score}% due to: ${conflicts}. Risks: ${risks}. ${classCode ? `Class ${classCode}.` : ''}\nGenerate 6 distinctive alternative brand names.\nReturn ONLY: {"suggestions":[{"name":"MARKNAME","reason":"one sentence why stronger"}]}`
+          content: `The proposed trademark "${markName}" scored ${score}% approval likelihood due to: ${conflicts}. Risks: ${risks}. ${classCode ? `Class ${classCode}.` : ''}\nGenerate 6 distinctive alternative brand names.\nReturn ONLY: {"suggestions":[{"name":"MARKNAME","reason":"one sentence why stronger"}]}`
         }]
-      }),
+      })
     });
 
     const text = await resp.text();
     if (!resp.ok) throw new Error(`Claude API (${resp.status})`);
-    const outer = JSON.parse(text);
-    const raw = outer?.content?.[0]?.text || '';
-    return res.json(parseJson(raw));
+    const parsed = JSON.parse(text);
+    const rawContent = parsed?.content?.[0]?.text || '';
+    return res.json(safeJsonParse(rawContent));
   } catch (e) {
     return res.status(500).json({ error: 'Suggestion failed', message: String(e?.message || e) });
   }
 });
 
-app.get('/api/db-status', (_req, res) => res.json({ source: 'USPTO tmsearch', status: 'live' }));
 app.get('/health', (_req, res) => res.json({ ok: true }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
+app.listen(PORT, async () => {
+  console.log(`Trademarkyo running on port ${PORT}`);
+  // Pre-warm the browser so first search is faster
+  try {
+    await getBrowser();
+    console.log('[browser] Pre-warmed and ready');
+  } catch (e) {
+    console.error('[browser] Pre-warm failed:', e.message);
+  }
+});
