@@ -203,6 +203,30 @@ async function scrapeVariant(browser, markName, classCode) {
         '[class*="result-item"]', '[class*="search-result"]',
         'mat-list-item', 'mat-card', 'tbody tr', '[role="listitem"]', '[role="row"]',
       ];
+
+      // Extract status from a dedicated DOM element within the card,
+      // not from a text blob that may bleed across adjacent cards.
+      function getStatusFromCard(el) {
+        const statusSelectors = [
+          '[class*="status"]', '[class*="badge"]', '[class*="chip"]',
+          'mat-chip', 'span.status',
+        ];
+        for (const sel of statusSelectors) {
+          const statusEl = el.querySelector(sel);
+          if (statusEl) {
+            const t = (statusEl.innerText || statusEl.textContent || '').trim().toUpperCase();
+            if (t === 'LIVE' || t === 'DEAD') return t;
+            if (/^LIVE/.test(t)) return 'LIVE';
+            if (/^DEAD|CANCEL|ABANDON/.test(t)) return 'DEAD';
+          }
+        }
+        // Fallback: check only the first 120 chars of this card (status label is always near top)
+        const snippet = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().substring(0, 120).toUpperCase();
+        if (/\bLIVE\b/.test(snippet)) return 'LIVE';
+        if (/\bDEAD\b|\bCANCEL|\bABANDON/.test(snippet)) return 'DEAD';
+        return 'UNKNOWN';
+      }
+
       for (const sel of selectors) {
         const els = document.querySelectorAll(sel);
         if (els.length > 1) {
@@ -210,7 +234,8 @@ async function scrapeVariant(browser, markName, classCode) {
             const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
             if (text.length < 5) return;
             const serial = text.match(/\b(\d{8})\b/)?.[1];
-            items.push({ text: text.substring(0, 500), serial: serial || null });
+            const status = getStatusFromCard(el);
+            items.push({ text: text.substring(0, 500), serial: serial || null, status });
           });
           if (items.length > 2) break;
         }
@@ -224,18 +249,26 @@ async function scrapeVariant(browser, markName, classCode) {
       for (const r of itemsWithSerials) {
         results.push({
           source: 'tmsearch', serialNumber: r.serial,
-          liveDeadStatus: /dead|abandon|cancel/i.test(r.text) ? 'DEAD' : 'LIVE',
+          // Use DOM-extracted status; only fall back to text scan if DOM gave UNKNOWN
+          liveDeadStatus: r.status !== 'UNKNOWN'
+            ? r.status
+            : (/dead|abandon|cancel/i.test(r.text) ? 'DEAD' : 'LIVE'),
           markName: null, owner: null, goodsServices: r.text,
           internationalClass: classCode || null, filingDate: null, registrationDate: null,
         });
       }
     } else if (uniqueSerials.length > 0) {
+      // Fallback: read text AFTER the serial only to avoid bleeding from previous result
       for (const serial of uniqueSerials) {
         const idx = fullText.indexOf(serial);
-        const context = fullText.substring(Math.max(0, idx - 100), idx + 300);
+        const context = fullText.substring(idx, idx + 400);
+        const snippet = context.substring(0, 120).toUpperCase();
+        let status = 'LIVE';
+        if (/\bDEAD\b|\bCANCEL|\bABANDON/.test(snippet)) status = 'DEAD';
+        else if (/\bLIVE\b/.test(snippet)) status = 'LIVE';
         results.push({
           source: 'tmsearch', serialNumber: serial,
-          liveDeadStatus: /dead|abandon|cancel/i.test(context) ? 'DEAD' : 'LIVE',
+          liveDeadStatus: status,
           markName: null, owner: null, goodsServices: context.replace(/\s+/g, ' ').trim(),
           internationalClass: classCode || null, filingDate: null, registrationDate: null,
         });
