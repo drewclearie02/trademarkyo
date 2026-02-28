@@ -1,180 +1,738 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trademarkyo — USPTO Clearance Scanner</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
-    --bg: #0a0a0a; --surface: #111111; --surface2: #1a1a1a;
-    --border: #222222; --accent: #e8ff47; --text: #f0f0f0;
-    --muted: #666666; --green: #47ff8a; --yellow: #ffcc47; --red: #ff4747;
+    --bg: #0a0a0a; --surface: #141414; --surface2: #1c1c1c;
+    --border: #2a2a2a; --border-light: #333333; --accent: #e8ff47; --text: #f0f0f0;
+    --text-secondary: #b0b0b0; --muted: #555555; --green: #47ff8a; --yellow: #ffcc47; --red: #ff4747;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
-  body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 999; opacity: 0.4; }
-  .header { padding: 1rem 3rem; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-  .logo-img { height: 48px; width: auto; display: block; }
-  .badge { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); border: 1px solid var(--border); padding: 0.3rem 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; }
-  .live-indicator { display: flex; align-items: center; gap: 0.5rem; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--green); letter-spacing: 0.1em; }
-  .live-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .hero { padding: 5rem 3rem 3rem; max-width: 900px; margin: 0 auto; }
-  .hero-eyebrow { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--accent); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 999; opacity: 0.4;
+  }
+
+  /* ── HEADER ─────────────────────────────────── */
+  .header {
+    padding: 1.1rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo-wordmark {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 1.35rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+  .logo-wordmark span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 1.5rem; }
+  .badge {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 0.3rem 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  .live-indicator {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    color: var(--green);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .live-dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(71,255,138,0.4); } 50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(71,255,138,0); } }
+
+  /* ── HERO ─────────────────────────────────── */
+  .hero {
+    padding: 5rem 3rem 3rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .hero-eyebrow {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
   .hero-eyebrow::before { content: ''; width: 2rem; height: 1px; background: var(--accent); }
-  h1 { font-family: 'Bebas Neue', cursive; font-size: clamp(3.5rem, 8vw, 7rem); line-height: 0.95; letter-spacing: 0.02em; margin-bottom: 1.5rem; }
+  h1 {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(3rem, 7vw, 6.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+  }
   h1 .highlight { color: var(--accent); display: block; }
-  .hero-sub { font-size: 1rem; color: var(--muted); max-width: 500px; line-height: 1.6; font-weight: 300; margin-bottom: 3rem; }
-  .search-container { max-width: 900px; margin: 0 auto; padding: 0 3rem 3rem; }
-  .search-box { background: var(--surface); border: 1px solid var(--border); padding: 2rem; position: relative; }
-  .search-box::before { content: ''; position: absolute; top: -1px; left: 0; width: 4rem; height: 3px; background: var(--accent); }
-  .field-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.75rem; display: block; }
+  .hero-sub {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    max-width: 560px;
+    line-height: 1.65;
+    font-weight: 400;
+    margin-bottom: 3rem;
+  }
+
+  /* ── SEARCH ─────────────────────────────────── */
+  .search-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 3rem 3rem;
+  }
+  .search-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2rem;
+    position: relative;
+  }
+  .search-box::before {
+    content: ''; position: absolute; top: -1px; left: 0;
+    width: 5rem; height: 3px; background: var(--accent);
+  }
+  .field-label {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 0.75rem;
+    display: block;
+  }
   .input-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
-  input[type="text"] { flex: 1; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 1.4rem; font-weight: 600; padding: 1rem 1.25rem; outline: none; transition: border-color 0.2s; letter-spacing: 0.05em; }
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    padding: 1rem 1.25rem;
+    outline: none;
+    transition: border-color 0.2s;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
   input[type="text"]:focus { border-color: var(--accent); }
-  input[type="text"]::placeholder { color: var(--muted); font-weight: 300; font-size: 1.2rem; }
-  .class-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.75rem; padding: 1rem; outline: none; cursor: pointer; min-width: 260px; }
+  input[type="text"]::placeholder {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 1.1rem;
+    letter-spacing: 0.03em;
+    text-transform: none;
+  }
+  input[type="text"]:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: var(--surface2);
+  }
+  .class-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 1rem;
+    outline: none;
+    cursor: pointer;
+    min-width: 280px;
+  }
   .class-select:focus { border-color: var(--accent); }
+  .class-select:disabled { opacity: 0.6; cursor: not-allowed; }
   .class-select optgroup { color: var(--muted); font-size: 0.65rem; }
-  .btn-scan { width: 100%; background: var(--accent); color: #000; border: none; font-family: 'Bebas Neue', cursive; font-size: 1.4rem; letter-spacing: 0.1em; padding: 1.1rem; cursor: pointer; transition: all 0.15s; }
+  .btn-scan {
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 1.15rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
   .btn-scan:hover { background: #fff; }
   .btn-scan:active { transform: scale(0.99); }
   .btn-scan:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
-  .results-container { max-width: 900px; margin: 0 auto; padding: 0 3rem 5rem; }
-  .verdict-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.4s ease forwards; }
-  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-  .verdict-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2rem; gap: 2rem; }
-  .verdict-title { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.5rem; }
-  .verdict-mark { font-family: 'Bebas Neue', cursive; font-size: 3rem; letter-spacing: 0.05em; }
+
+  /* ── RESULTS ─────────────────────────────────── */
+  .results-container { max-width: 1200px; margin: 0 auto; padding: 0 3rem 5rem; }
+  .verdict-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    animation: slideUp 0.4s ease forwards;
+  }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .verdict-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 2rem; gap: 2rem;
+  }
+  .verdict-title {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  .verdict-mark {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 3rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
   .score-display { text-align: right; flex-shrink: 0; }
-  .score-number { font-family: 'Bebas Neue', cursive; font-size: 5rem; line-height: 1; display: block; }
-  .score-label { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .score-number {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 5.5rem;
+    line-height: 1;
+    display: block;
+    letter-spacing: -0.02em;
+  }
+  .score-label {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
   .score-green { color: var(--green); }
   .score-yellow { color: var(--yellow); }
   .score-red { color: var(--red); }
-  .verdict-bar { height: 4px; background: var(--border); margin-bottom: 2rem; overflow: hidden; }
-  .verdict-bar-fill { height: 100%; transition: width 1s cubic-bezier(0.4,0,0.2,1); }
-  .verdict-analysis { font-size: 0.95rem; color: var(--text); line-height: 1.7; font-weight: 300; margin-bottom: 2rem; padding: 1.5rem; background: var(--bg); border-left: 3px solid var(--accent); }
-  .section-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; }
+  .verdict-bar { height: 3px; background: var(--border); margin-bottom: 2rem; overflow: hidden; }
+  .verdict-bar-fill { height: 100%; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+  .verdict-analysis {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.75;
+    font-weight: 400;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+  }
+  .section-label {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 0.75rem;
+  }
   .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-  .conflict-item { background: var(--bg); border: 1px solid var(--border); padding: 1.25rem 1.5rem; margin-bottom: 0.5rem; display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center; transition: border-color 0.2s; cursor: pointer; }
-  .conflict-item:hover { border-color: var(--accent); }
+  .conflict-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 0.4rem;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 1rem;
+    align-items: center;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+  }
+  .conflict-item:hover { border-color: var(--accent); background: var(--surface2); }
   .conflict-item:hover .conflict-mark { color: var(--accent); }
-  .conflict-mark { font-weight: 600; font-size: 1rem; letter-spacing: 0.05em; transition: color 0.2s; }
-  .conflict-goods { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; font-weight: 300; }
-  .conflict-serial { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); }
-  .risk-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.3rem 0.6rem; font-weight: 500; }
-  .risk-high { background: rgba(255,71,71,0.15); color: var(--red); }
-  .risk-med { background: rgba(255,204,71,0.15); color: var(--yellow); }
-  .risk-low { background: rgba(71,255,138,0.15); color: var(--green); }
-  .status-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; padding: 0.2rem 0.5rem; text-transform: uppercase; }
-  .live { background: rgba(71,255,138,0.1); color: var(--green); }
-  .dead { background: rgba(102,102,102,0.2); color: var(--muted); }
-  .loading-state { padding: 4rem 0; text-align: center; }
-  .loading-spinner { width: 2rem; height: 2rem; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-text { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
-  .loading-step { margin-top: 0.5rem; font-size: 0.7rem; color: var(--accent); font-family: 'DM Mono', monospace; min-height: 1rem; }
-  .error-box { background: rgba(255,71,71,0.08); border: 1px solid rgba(255,71,71,0.3); padding: 1.5rem; font-size: 0.9rem; color: var(--red); font-family: 'DM Mono', monospace; }
+  .conflict-mark {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+    text-transform: uppercase;
+  }
+  .conflict-goods {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    font-weight: 400;
+  }
+  .conflict-serial {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  .risk-tag {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.55rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.65rem;
+  }
+  .risk-high { background: rgba(255,71,71,0.12); color: var(--red); border: 1px solid rgba(255,71,71,0.2); }
+  .risk-med { background: rgba(255,204,71,0.12); color: var(--yellow); border: 1px solid rgba(255,204,71,0.2); }
+  .risk-low { background: rgba(71,255,138,0.12); color: var(--green); border: 1px solid rgba(71,255,138,0.2); }
+  .status-tag {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    padding: 0.2rem 0.55rem;
+    text-transform: uppercase;
+  }
+  .live { background: rgba(71,255,138,0.1); color: var(--green); border: 1px solid rgba(71,255,138,0.2); }
+  .dead { background: rgba(80,80,80,0.2); color: var(--muted); border: 1px solid rgba(80,80,80,0.2); }
+
+  /* ── STATS ROW ─────────────────────────────────── */
   .stats-row { display: flex; gap: 1px; margin-bottom: 2rem; background: var(--border); }
-  .stat-box { flex: 1; background: var(--surface2); padding: 1.25rem; text-align: center; }
-  .stat-num { font-family: 'Bebas Neue', cursive; font-size: 2rem; display: block; color: var(--accent); }
-  .stat-lbl { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
-  .no-conflicts { padding: 2rem; text-align: center; font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--green); border: 1px dashed rgba(71,255,138,0.3); letter-spacing: 0.1em; }
-  .source-tag { font-family: 'DM Mono', monospace; font-size: 0.6rem; padding: 0.2rem 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; }
-  .source-live { background: rgba(71,255,138,0.1); color: var(--green); }
-  .source-ai { background: rgba(232,255,71,0.1); color: var(--accent); }
-  .disclaimer { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); line-height: 1.6; padding: 2rem 3rem; border-top: 1px solid var(--border); max-width: 900px; margin: 0 auto; letter-spacing: 0.05em; }
-  .btn-pdf { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.6rem 1.2rem; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+  .stat-box { flex: 1; background: var(--surface2); padding: 1.4rem; text-align: center; }
+  .stat-num {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 2.2rem;
+    display: block;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+  .stat-lbl {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.55rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.2rem;
+    display: block;
+  }
+
+  /* ── MISC UI ─────────────────────────────────── */
+  .no-conflicts {
+    padding: 2.5rem;
+    text-align: center;
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: var(--green);
+    border: 1px dashed rgba(71,255,138,0.3);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .source-tag {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.55rem;
+    padding: 0.2rem 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .source-live { background: rgba(71,255,138,0.1); color: var(--green); border: 1px solid rgba(71,255,138,0.2); }
+  .source-ai { background: rgba(232,255,71,0.1); color: var(--accent); border: 1px solid rgba(232,255,71,0.2); }
+  .disclaimer {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.65rem;
+    color: var(--muted);
+    line-height: 1.7;
+    padding: 2rem 3rem;
+    border-top: 1px solid var(--border);
+    max-width: 1200px;
+    margin: 0 auto;
+    letter-spacing: 0.04em;
+  }
+  .btn-pdf {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 0.5rem;
+    flex-shrink: 0;
+  }
   .btn-pdf:hover { border-color: var(--accent); color: var(--accent); }
   .btn-pdf svg { width: 12px; height: 12px; }
+  .loading-state { padding: 4rem 0; text-align: center; }
+  .loading-spinner {
+    width: 2rem; height: 2rem;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1.5rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  .loading-step {
+    margin-top: 0.5rem;
+    font-size: 0.65rem;
+    color: var(--accent);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    min-height: 1rem;
+  }
+  .error-box {
+    background: rgba(255,71,71,0.06);
+    border: 1px solid rgba(255,71,71,0.25);
+    padding: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--red);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+  }
+  .click-hint {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.6rem;
+    color: var(--muted);
+    text-align: right;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ── MODAL ─────────────────────────────────── */
   #markModal { position: fixed; inset: 0; z-index: 8888; display: none; align-items: center; justify-content: center; padding: 1rem; }
   #markModal.open { display: flex; }
-  .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); }
-  .modal-box { position: relative; background: var(--surface); border: 1px solid var(--border); width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.2s ease forwards; }
-  .modal-box::before { content: ''; position: absolute; top: -1px; left: 0; width: 4rem; height: 3px; background: var(--accent); }
-  .modal-header { padding: 1.5rem 1.5rem 1.25rem; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--border); }
-  .modal-mark { font-family: 'Bebas Neue', cursive; font-size: 2.2rem; letter-spacing: 0.05em; }
-  .modal-close { background: none; border: none; color: var(--muted); font-size: 1.5rem; cursor: pointer; line-height: 1; padding: 0.25rem; transition: color 0.15s; flex-shrink: 0; }
+  .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(4px); }
+  .modal-box {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    width: 100%; max-width: 620px;
+    max-height: 90vh; overflow-y: auto;
+    animation: slideUp 0.2s ease forwards;
+  }
+  .modal-box::before { content: ''; position: absolute; top: -1px; left: 0; width: 5rem; height: 3px; background: var(--accent); }
+  .modal-header {
+    padding: 1.5rem 1.5rem 1.25rem;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-mark {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .modal-close {
+    background: none; border: none; color: var(--muted);
+    font-size: 1.3rem; cursor: pointer; line-height: 1;
+    padding: 0.25rem; transition: color 0.15s; flex-shrink: 0;
+  }
   .modal-close:hover { color: var(--text); }
   .modal-body { padding: 1.5rem; }
   .modal-field { margin-bottom: 1.5rem; }
-  .modal-field-label { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.4rem; }
-  .modal-field-value { font-size: 0.9rem; color: var(--text); line-height: 1.5; }
-  .modal-field-value a { color: var(--accent); text-decoration: none; font-family: 'DM Mono', monospace; font-size: 0.75rem; }
+  .modal-field-label {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.55rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+  .modal-field-value {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.55;
+  }
+  .modal-field-value a { color: var(--accent); text-decoration: none; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.05em; }
   .modal-field-value a:hover { text-decoration: underline; }
   .modal-tags { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
   .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-  .modal-stat { background: var(--bg); padding: 1rem; }
-  .modal-stat-label { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.3rem; }
-  .modal-stat-value { font-size: 0.9rem; font-weight: 600; }
+  .modal-stat { background: var(--bg); padding: 1rem; border: 1px solid var(--border); }
+  .modal-stat-label {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.55rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.3rem;
+  }
+  .modal-stat-value {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
   .modal-divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
-  .modal-analysis { background: var(--bg); border-left: 3px solid var(--accent); padding: 1rem 1.25rem; font-size: 0.85rem; line-height: 1.6; color: var(--text); font-weight: 300; }
-  .click-hint { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); text-align: right; margin-bottom: 0.5rem; letter-spacing: 0.1em; }
-  /* NAME SUGGESTIONS */
-  .suggestions-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.5s ease forwards; position: relative; overflow: hidden; }
-  .suggestions-card::before { content: ''; position: absolute; top: -1px; left: 0; width: 4rem; height: 3px; background: var(--accent); }
-  .suggestions-card::after { content: 'AI'; position: absolute; top: 1.5rem; right: 2rem; font-family: 'Bebas Neue', cursive; font-size: 5rem; color: rgba(232,255,71,0.04); letter-spacing: 0.1em; pointer-events: none; }
-  .suggestions-intro { font-size: 0.9rem; color: var(--muted); line-height: 1.6; font-weight: 300; margin-bottom: 2rem; }
+  .modal-analysis {
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.25rem;
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  /* ── SUGGESTIONS ─────────────────────────────────── */
+  .suggestions-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 2.5rem;
+    margin-bottom: 2rem;
+    animation: slideUp 0.5s ease forwards;
+    position: relative; overflow: hidden;
+  }
+  .suggestions-card::before { content: ''; position: absolute; top: -1px; left: 0; width: 5rem; height: 3px; background: var(--accent); }
+  .suggestions-header-note {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    font-weight: 400;
+    margin-bottom: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--bg);
+    border-left: 3px solid var(--green);
+  }
+  .suggestions-intro {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    font-weight: 400;
+    margin-bottom: 2rem;
+  }
   .suggestion-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
-  .suggestion-item { background: var(--bg); border: 1px solid var(--border); padding: 1.25rem 1.5rem; cursor: pointer; transition: all 0.15s; position: relative; }
+  .suggestion-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
   .suggestion-item:hover { border-color: var(--accent); transform: translateY(-2px); }
   .suggestion-item:hover .suggestion-name { color: var(--accent); }
-  .suggestion-name { font-family: 'Bebas Neue', cursive; font-size: 1.5rem; letter-spacing: 0.05em; margin-bottom: 0.4rem; transition: color 0.15s; }
-  .suggestion-why { font-size: 0.75rem; color: var(--muted); line-height: 1.4; font-weight: 300; }
-  .suggestion-score-badge { position: absolute; top: 0.75rem; right: 0.75rem; font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.1em; padding: 0.2rem 0.4rem; background: rgba(71,255,138,0.1); color: var(--green); text-transform: uppercase; }
+  .suggestion-name {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.4rem;
+    transition: color 0.15s;
+    text-transform: uppercase;
+  }
+  .suggestion-why {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    font-weight: 400;
+  }
   .suggestions-loading { padding: 2rem; text-align: center; }
   .suggestions-loading .loading-spinner { margin-bottom: 1rem; }
-  .btn-resuggest { background: transparent; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.6rem 1.2rem; cursor: pointer; transition: all 0.15s; margin-top: 0.5rem; white-space: nowrap; }
+  .btn-resuggest {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.6rem 1.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 0.5rem;
+    white-space: nowrap;
+  }
   .btn-resuggest:hover { border-color: var(--accent); color: var(--accent); }
-  .try-name-hint { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); margin-top: 1rem; letter-spacing: 0.08em; }
-  /* PASSWORD GATE */
-  #passGate { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+  .try-name-hint {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.6rem;
+    color: var(--muted);
+    margin-top: 1rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ── PASSWORD GATE ─────────────────────────────────── */
+  #passGate {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    z-index: 9999;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 2rem;
+  }
   #passGate.hidden { display: none; }
   #appContent { display: none; }
   #appContent.visible { display: block; }
-  .gate-grid { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background-image: linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px); background-size: 60px 60px; }
-  .gate-glow { position: absolute; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(232,255,71,0.06) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); animation: glowPulse 3s ease-in-out infinite; }
+  .gate-grid {
+    position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+    background-image: linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+  .gate-glow {
+    position: absolute;
+    width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(232,255,71,0.05) 0%, transparent 70%);
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    animation: glowPulse 3s ease-in-out infinite;
+  }
   @keyframes glowPulse { 0%,100% { opacity: 0.6; transform: translate(-50%,-50%) scale(1); } 50% { opacity: 1; transform: translate(-50%,-50%) scale(1.1); } }
   .gate-content { position: relative; z-index: 1; text-align: center; max-width: 480px; width: 100%; }
-  .gate-logo-img { height: 120px; width: auto; margin: 0 auto 2rem; display: block; filter: drop-shadow(0 0 30px rgba(163,230,53,0.3)); }
-  .gate-tagline { font-family: 'Bebas Neue', cursive; font-size: clamp(2.2rem, 6vw, 3.8rem); line-height: 1.05; letter-spacing: 0.02em; margin-bottom: 0.75rem; color: var(--text); }
+  .gate-wordmark {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 2.5rem;
+    color: var(--text);
+  }
+  .gate-wordmark span { color: var(--accent); }
+  .gate-tagline {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.2rem, 6vw, 3.8rem);
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+    text-transform: uppercase;
+  }
   .gate-tagline .accent { color: var(--accent); }
-  .gate-sub { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 3rem; }
+  .gate-sub {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 3rem;
+  }
   .gate-input-wrap { position: relative; margin-bottom: 1rem; }
   .gate-input-wrap::before { content: ''; position: absolute; top: -1px; left: 0; width: 3rem; height: 3px; background: var(--accent); }
-  #passInput { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 400; padding: 1rem 1.25rem; outline: none; letter-spacing: 0.4em; text-align: center; transition: border-color 0.2s; }
+  #passInput {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    padding: 1rem 1.25rem;
+    outline: none;
+    letter-spacing: 0.4em;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
   #passInput:focus { border-color: var(--accent); }
   #passInput.error { border-color: var(--red); animation: shake 0.4s ease; }
   @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-6px)} 80%{transform:translateX(6px)} }
-  .gate-btn { width: 100%; background: var(--accent); color: #000; border: none; font-family: 'Bebas Neue', cursive; font-size: 1.3rem; letter-spacing: 0.15em; padding: 1rem; cursor: pointer; transition: all 0.15s; margin-bottom: 1rem; }
+  .gate-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 1rem;
+  }
   .gate-btn:hover { background: #fff; }
-  .gate-error { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--red); letter-spacing: 0.1em; min-height: 1.2rem; }
+  .gate-error {
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 0.7rem;
+    color: var(--red);
+    letter-spacing: 0.1em;
+    min-height: 1.2rem;
+  }
   .gate-ticker { position: absolute; bottom: 2rem; left: 0; right: 0; overflow: hidden; border-top: 1px solid var(--border); padding: 0.75rem 0; }
-  .gate-ticker-inner { display: flex; gap: 3rem; white-space: nowrap; animation: ticker 20s linear infinite; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .gate-ticker-inner {
+    display: flex; gap: 3rem; white-space: nowrap;
+    animation: ticker 20s linear infinite;
+    font-family: Helvetica, 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 700;
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
   @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
   /* ── MOBILE RESPONSIVE ─────────────────────────────────── */
   @media (max-width: 640px) {
     .header { padding: 0.75rem 1.25rem; gap: 0.75rem; }
     .badge { display: none; }
-    .logo-img { height: 36px; }
     .hero { padding: 2.5rem 1.25rem 1.5rem; }
-    h1 { font-size: clamp(2.8rem, 12vw, 4rem); }
+    h1 { font-size: clamp(2.6rem, 11vw, 3.8rem); }
     .hero-sub { font-size: 0.9rem; margin-bottom: 2rem; }
     .search-container { padding: 0 1.25rem 2rem; }
     .search-box { padding: 1.25rem; }
     .input-row { flex-direction: column; gap: 0.75rem; }
     input[type="text"] { font-size: 1.1rem; padding: 0.9rem 1rem; }
     .class-select { min-width: unset; width: 100%; font-size: 0.8rem; padding: 0.9rem 1rem; }
-    .btn-scan { font-size: 1.2rem; padding: 1rem; }
+    .btn-scan { font-size: 0.85rem; padding: 1rem; }
     .results-container { padding: 0 1.25rem 3rem; }
     #suggestionsContainer { padding: 0 1.25rem; }
     .verdict-card { padding: 1.25rem; }
     .verdict-header { flex-direction: column; gap: 0; margin-bottom: 1.25rem; }
-    .verdict-mark { font-size: 2.2rem; }
+    .verdict-mark { font-size: 2rem; }
     .score-display { text-align: left; display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; }
     .score-number { font-size: 3.5rem; }
     .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
@@ -185,22 +743,21 @@
     .btn-pdf { width: 100%; justify-content: center; }
     .suggestions-card { padding: 1.25rem; }
     .suggestion-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-    .suggestion-name { font-size: 1.2rem; }
+    .suggestion-name { font-size: 1.1rem; }
     #markModal { padding: 0; align-items: flex-end; }
-    .modal-box { max-width: 100%; max-height: 92vh; border-radius: 0; border-left: none; border-right: none; border-bottom: none; }
+    .modal-box { max-width: 100%; max-height: 92vh; border-left: none; border-right: none; border-bottom: none; }
     .modal-body { padding: 1.25rem; }
     .modal-header { padding: 1.25rem; }
-    .modal-mark { font-size: 1.8rem; }
+    .modal-mark { font-size: 1.6rem; }
     .modal-grid { grid-template-columns: 1fr; }
     .disclaimer { padding: 1.5rem 1.25rem; }
-    .gate-logo-img { height: 90px; margin-bottom: 1.5rem; }
     .gate-tagline { font-size: clamp(2rem, 10vw, 2.8rem); }
-    .gate-sub { margin-bottom: 2rem; font-size: 0.65rem; }
+    .gate-sub { margin-bottom: 2rem; font-size: 0.6rem; }
     .gate-ticker { bottom: 1rem; }
   }
   @media (max-width: 400px) {
     .suggestion-grid { grid-template-columns: 1fr; }
-    h1 { font-size: 2.6rem; }
+    h1 { font-size: 2.4rem; }
   }
 </style>
 </head>
@@ -211,6 +768,7 @@
   <div class="gate-grid"></div>
   <div class="gate-glow"></div>
   <div class="gate-content">
+    <div class="gate-wordmark">TRADEMARK<span>YO</span></div>
     <div class="gate-tagline">READY TO<br><span class="accent">TRADEMARK</span><br>TODAY?</div>
     <div class="gate-sub">Enter your access code to continue</div>
     <div class="gate-input-wrap">
@@ -237,7 +795,7 @@
   <div class="modal-box">
     <div class="modal-header">
       <div>
-        <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:0.4rem">Conflict Detail</div>
+        <div style="font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:0.55rem;color:var(--text-secondary);letter-spacing:0.22em;text-transform:uppercase;margin-bottom:0.4rem">Conflict Detail</div>
         <div class="modal-mark" id="modalMarkName">—</div>
       </div>
       <button class="modal-close" onclick="closeModal()">✕</button>
@@ -247,7 +805,7 @@
       <div class="modal-grid" id="modalGrid"></div>
       <div class="modal-field" id="modalGoods"></div>
       <div class="modal-divider"></div>
-      <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:0.75rem">AI Conflict Analysis</div>
+      <div style="font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:0.55rem;color:var(--text-secondary);letter-spacing:0.22em;text-transform:uppercase;margin-bottom:0.75rem">AI Conflict Analysis</div>
       <div class="modal-analysis" id="modalAnalysis"></div>
       <div style="margin-top:1.5rem" id="modalLinks"></div>
     </div>
@@ -257,7 +815,8 @@
 <!-- MAIN APP -->
 <div id="appContent">
 <header class="header">
-  <div style="display:flex;align-items:center;gap:1.5rem">
+  <div class="logo-wordmark">TRADEMARK<span>YO</span></div>
+  <div class="header-right">
     <div class="live-indicator"><div class="live-dot"></div>LIVE USPTO DATA</div>
     <div class="badge">AI TRADEMARK ANALYSIS</div>
   </div>
@@ -273,57 +832,57 @@
   <div class="search-box">
     <label class="field-label">Enter your trademark name</label>
     <div class="input-row">
-      <input type="text" id="markInput" placeholder="e.g. GOLDYN" autocomplete="off" />
+      <input type="text" id="markInput" placeholder="e.g. NIKE" autocomplete="off" />
       <select class="class-select" id="classSelect">
         <option value="">All Classes</option>
         <optgroup label="── Goods ──────────────">
         <option value="1">Class 1 — Chemicals</option>
-        <option value="2">Class 2 — Paints & Coatings</option>
-        <option value="3">Class 3 — Cosmetics & Cleaning</option>
-        <option value="4">Class 4 — Lubricants & Fuels</option>
-        <option value="5">Class 5 — Pharmaceuticals & Supplements</option>
+        <option value="2">Class 2 — Paints &amp; Coatings</option>
+        <option value="3">Class 3 — Cosmetics &amp; Cleaning</option>
+        <option value="4">Class 4 — Lubricants &amp; Fuels</option>
+        <option value="5">Class 5 — Pharmaceuticals &amp; Supplements</option>
         <option value="6">Class 6 — Metal Goods</option>
         <option value="7">Class 7 — Machinery</option>
         <option value="8">Class 8 — Hand Tools</option>
-        <option value="9">Class 9 — Electronics & Software</option>
+        <option value="9">Class 9 — Electronics &amp; Software</option>
         <option value="10">Class 10 — Medical Devices</option>
-        <option value="11">Class 11 — Lighting & HVAC</option>
+        <option value="11">Class 11 — Lighting &amp; HVAC</option>
         <option value="12">Class 12 — Vehicles</option>
         <option value="13">Class 13 — Firearms</option>
-        <option value="14">Class 14 — Jewelry & Watches</option>
+        <option value="14">Class 14 — Jewelry &amp; Watches</option>
         <option value="15">Class 15 — Musical Instruments</option>
-        <option value="16">Class 16 — Paper & Printed Matter</option>
-        <option value="17">Class 17 — Rubber & Plastics</option>
-        <option value="18">Class 18 — Leather Goods & Bags</option>
+        <option value="16">Class 16 — Paper &amp; Printed Matter</option>
+        <option value="17">Class 17 — Rubber &amp; Plastics</option>
+        <option value="18">Class 18 — Leather Goods &amp; Bags</option>
         <option value="19">Class 19 — Building Materials</option>
         <option value="20">Class 20 — Furniture</option>
-        <option value="21">Class 21 — Housewares & Glass</option>
-        <option value="22">Class 22 — Ropes & Fibers</option>
-        <option value="23">Class 23 — Yarns & Threads</option>
-        <option value="24">Class 24 — Textiles & Fabrics</option>
-        <option value="25">Class 25 — Clothing & Footwear</option>
-        <option value="26">Class 26 — Lace & Embroidery</option>
-        <option value="27">Class 27 — Carpets & Floor Coverings</option>
-        <option value="28">Class 28 — Games & Sporting Goods</option>
+        <option value="21">Class 21 — Housewares &amp; Glass</option>
+        <option value="22">Class 22 — Ropes &amp; Fibers</option>
+        <option value="23">Class 23 — Yarns &amp; Threads</option>
+        <option value="24">Class 24 — Textiles &amp; Fabrics</option>
+        <option value="25">Class 25 — Clothing &amp; Footwear</option>
+        <option value="26">Class 26 — Lace &amp; Embroidery</option>
+        <option value="27">Class 27 — Carpets &amp; Floor Coverings</option>
+        <option value="28">Class 28 — Games &amp; Sporting Goods</option>
         <option value="29">Class 29 — Food (Meat, Dairy, Processed)</option>
         <option value="30">Class 30 — Food (Staple, Bakery, Coffee)</option>
-        <option value="31">Class 31 — Fresh Food & Agriculture</option>
+        <option value="31">Class 31 — Fresh Food &amp; Agriculture</option>
         <option value="32">Class 32 — Beverages (Non-Alcoholic)</option>
         <option value="33">Class 33 — Alcoholic Beverages</option>
-        <option value="34">Class 34 — Tobacco & Smoking</option>
+        <option value="34">Class 34 — Tobacco &amp; Smoking</option>
         </optgroup>
         <optgroup label="── Services ────────────">
-        <option value="35">Class 35 — Advertising & Business</option>
-        <option value="36">Class 36 — Financial & Insurance</option>
-        <option value="37">Class 37 — Construction & Repair</option>
+        <option value="35">Class 35 — Advertising &amp; Business</option>
+        <option value="36">Class 36 — Financial &amp; Insurance</option>
+        <option value="37">Class 37 — Construction &amp; Repair</option>
         <option value="38">Class 38 — Telecommunications</option>
-        <option value="39">Class 39 — Transport & Travel</option>
+        <option value="39">Class 39 — Transport &amp; Travel</option>
         <option value="40">Class 40 — Treatment of Materials</option>
-        <option value="41">Class 41 — Education & Entertainment</option>
-        <option value="42">Class 42 — Software & Tech Services</option>
-        <option value="43">Class 43 — Food & Lodging Services</option>
-        <option value="44">Class 44 — Medical & Health Services</option>
-        <option value="45">Class 45 — Legal & Personal Services</option>
+        <option value="41">Class 41 — Education &amp; Entertainment</option>
+        <option value="42">Class 42 — Software &amp; Tech Services</option>
+        <option value="43">Class 43 — Food &amp; Lodging Services</option>
+        <option value="44">Class 44 — Medical &amp; Health Services</option>
+        <option value="45">Class 45 — Legal &amp; Personal Services</option>
         </optgroup>
       </select>
     </div>
@@ -332,7 +891,7 @@
 </div>
 
 <div class="results-container" id="resultsContainer"></div>
-<div id="suggestionsContainer" style="max-width:900px;margin:0 auto;padding:0 3rem;"></div>
+<div id="suggestionsContainer" style="max-width:1200px;margin:0 auto;padding:0 3rem;"></div>
 
 <div class="disclaimer">
   ⚠ NOT LEGAL ADVICE — This tool queries live USPTO data and uses AI analysis to estimate approval likelihood. Results are estimates only and should not substitute for consultation with a licensed trademark attorney. Common law rights may exist outside the USPTO database.
@@ -372,8 +931,8 @@ function openModal(idx) {
   const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
   document.getElementById('modalMarkName').textContent = c.mark || 'Unknown Mark';
   document.getElementById('modalTags').innerHTML = `<span class="status-tag ${c.isLive ? 'live' : 'dead'}">${c.isLive ? '● LIVE' : '○ DEAD'}</span><span class="risk-tag ${riskClass}">${risk} RISK</span>`;
-  document.getElementById('modalGrid').innerHTML = `<div class="modal-stat"><div class="modal-stat-label">Serial Number</div><div class="modal-stat-value" style="font-family:'DM Mono',monospace;font-size:0.85rem">${c.serialNumber || 'N/A'}</div></div><div class="modal-stat"><div class="modal-stat-label">Status</div><div class="modal-stat-value" style="color:${c.isLive ? 'var(--green)' : 'var(--muted)'}">${c.isLive ? 'Live / Active' : 'Dead / Inactive'}</div></div>`;
-  document.getElementById('modalGoods').innerHTML = `<div class="modal-field-label">Goods & Services Overlap</div><div class="modal-field-value">${c.goods || 'No description available.'}</div>`;
+  document.getElementById('modalGrid').innerHTML = `<div class="modal-stat"><div class="modal-stat-label">Serial Number</div><div class="modal-stat-value" style="font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-size:0.85rem">${c.serialNumber || 'N/A'}</div></div><div class="modal-stat"><div class="modal-stat-label">Status</div><div class="modal-stat-value" style="color:${c.isLive ? 'var(--green)' : 'var(--muted)'}">${c.isLive ? 'Live / Active' : 'Dead / Inactive'}</div></div>`;
+  document.getElementById('modalGoods').innerHTML = `<div class="modal-field-label">Goods &amp; Services Overlap</div><div class="modal-field-value">${c.goods || 'No description available.'}</div>`;
   document.getElementById('modalAnalysis').innerHTML = `<strong>Similarity:</strong> ${c.reason || 'N/A'}<br><br><strong>Conflict Assessment:</strong> This mark presents a <strong>${risk.toLowerCase()} risk</strong> of confusion with your proposed mark. ${c.isLive ? 'This is an active registration and would be cited against your application.' : 'This mark is no longer active, which reduces but does not eliminate risk.'}`;
   const usptoUrl = c.serialNumber ? `https://tsdr.uspto.gov/#caseNumber=${c.serialNumber}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch` : null;
   document.getElementById('modalLinks').innerHTML = usptoUrl ? `<div class="modal-field-label" style="margin-bottom:0.5rem">View on USPTO</div><div class="modal-field-value"><a href="${usptoUrl}" target="_blank" rel="noopener">Open TSDR Record →</a></div>` : '';
@@ -386,26 +945,47 @@ function closeModal() {
 }
 
 let _currentMark = '', _currentClass = '', _currentAnalysis = null;
+
+// Lock inputs after scan starts
+function lockInputs() {
+  document.getElementById('markInput').disabled = true;
+  document.getElementById('classSelect').disabled = true;
+}
+function unlockInputs() {
+  document.getElementById('markInput').disabled = false;
+  document.getElementById('classSelect').disabled = false;
+}
+
 async function generateSuggestions(mark, classCode, analysis) {
   const container = document.getElementById('suggestionsContainer');
   const score = Number(analysis.approvalScore || 0);
   if (score >= 70) { container.innerHTML = ''; return; }
   const risks = (analysis.mainRisks || []).join('; ');
   const conflicts = (analysis.conflictAnalysis || []).map(c => c.markName).filter(Boolean).join(', ');
-  container.innerHTML = `<div class="suggestions-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem"><div><div class="section-label" style="margin-bottom:0.25rem">Alternative Name Suggestions</div><div class="suggestions-intro" style="margin-bottom:0">Your score of <strong style="color:${score >= 40 ? 'var(--yellow)' : 'var(--red)'}">${score}%</strong> suggests trademark conflicts. Here are AI-generated alternatives with stronger approval potential.</div></div><button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button></div><div class="suggestions-loading"><div class="loading-spinner"></div><div class="loading-text" style="font-size:0.7rem">Generating alternatives...</div></div></div>`;
+  container.innerHTML = `<div class="suggestions-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem"><div><div class="section-label" style="margin-bottom:0.25rem">Alternative Name Suggestions</div><div class="suggestions-header-note">These alternatives are likely to have a higher trademark approval rating, designed to avoid identified conflicts while preserving your brand intent.</div><div class="suggestions-intro" style="margin-bottom:0">Your score of <strong style="color:${score >= 40 ? 'var(--yellow)' : 'var(--red)'}">${score}%</strong> suggests trademark conflicts. AI-generated alternatives are loading below.</div></div><button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button></div><div class="suggestions-loading"><div class="loading-spinner"></div><div class="loading-text" style="font-size:0.7rem">Generating alternatives...</div></div></div>`;
   try {
     const resp = await fetch('/api/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ markName: mark, classCode, score, risks, conflicts }) });
     if (!resp.ok) throw new Error('Suggestion API failed');
     const data = await resp.json();
     const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
     if (suggestions.length === 0) throw new Error('No suggestions returned');
-    const grid = suggestions.map(s => `<div class="suggestion-item" onclick="trySuggestion('${s.name}')"><div class="suggestion-score-badge">↑ Higher Approval</div><div class="suggestion-name">${s.name}</div><div class="suggestion-why">${s.reason}</div></div>`).join('');
-    container.innerHTML = `<div class="suggestions-card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;flex-wrap:wrap;gap:1rem"><div class="section-label" style="margin-bottom:0">Alternative Name Suggestions</div><button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button></div><p class="suggestions-intro">Your score of <strong style="color:${score >= 40 ? 'var(--yellow)' : 'var(--red)'}">${score}%</strong> suggests trademark conflicts. These alternatives are designed to avoid the identified conflicts while preserving your brand intent.</p><div class="suggestion-grid">${grid}</div><div class="try-name-hint">↑ Click any name to instantly scan it</div></div>`;
+    const grid = suggestions.map(s => `<div class="suggestion-item" onclick="trySuggestion('${s.name}')"><div class="suggestion-name">${s.name}</div><div class="suggestion-why">${s.reason}</div></div>`).join('');
+    container.innerHTML = `<div class="suggestions-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:1rem">
+        <div class="section-label" style="margin-bottom:0">Alternative Name Suggestions</div>
+        <button class="btn-resuggest" onclick="generateSuggestions('${mark}','${classCode}',_currentAnalysis)">↻ Regenerate</button>
+      </div>
+      <div class="suggestions-header-note">These alternatives are likely to have a higher trademark approval rating, designed to avoid the identified conflicts while preserving your brand intent.</div>
+      <div class="suggestion-grid" style="margin-top:1.5rem">${grid}</div>
+      <div class="try-name-hint">↑ Click any name to instantly scan it</div>
+    </div>`;
   } catch (e) {
     container.innerHTML = `<div class="suggestions-card"><div class="section-label" style="margin-bottom:1rem">Alternative Name Suggestions</div><div class="error-box">Could not generate suggestions: ${e.message}</div></div>`;
   }
 }
+
 function trySuggestion(name) {
+  unlockInputs();
   document.getElementById('markInput').value = name;
   document.getElementById('markInput').focus();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -415,43 +995,129 @@ function trySuggestion(name) {
 function downloadPDF(mark, classCode, score, analysis, usptoData) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const W = 210; const margin = 18; const contentW = W - margin * 2; let y = 0;
+  const W = 210; const margin = 16; const contentW = W - margin * 2; let y = 0;
   const scoreColor = score >= 70 ? [71,255,138] : score >= 40 ? [255,204,71] : [255,71,71];
-  doc.setFillColor(10,10,10); doc.rect(0, 0, W, 28, 'F');
-  doc.setFillColor(...scoreColor); doc.rect(0, 0, 5, 28, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(232,255,71); doc.text('TRADEMARKYO', margin, 12);
-  doc.setFontSize(8); doc.setTextColor(100,100,100); doc.text('USPTO TRADEMARK CLEARANCE REPORT', margin, 19);
-  doc.setTextColor(180,180,180); doc.text(`Generated: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, margin, 25);
-  y = 38;
-  doc.setFillColor(17,17,17); doc.rect(margin, y, contentW, 28, 'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(24); doc.setTextColor(240,240,240); doc.text(mark, margin + 6, y + 13);
-  if (classCode) { doc.setFontSize(9); doc.setTextColor(100,100,100); doc.text(`Class ${classCode}`, margin + 6, y + 21); }
-  doc.setFont('helvetica','bold'); doc.setFontSize(28); doc.setTextColor(...scoreColor); doc.text(String(score), W - margin - 22, y + 14);
-  doc.setFontSize(7); doc.setTextColor(100,100,100); doc.text('APPROVAL SCORE', W - margin - 28, y + 21);
-  doc.setFontSize(8); doc.setTextColor(...scoreColor); doc.text((analysis.verdict||'').toUpperCase(), W - margin - 16, y + 26);
-  y += 34;
-  const statW = contentW / 4;
-  [{label:'RECORDS REVIEWED',val:String(usptoData.totalFound||0)},{label:'LIVE CONFLICTS',val:String((analysis.conflictAnalysis||[]).filter(c=>String(c.status||'').toUpperCase().includes('LIVE')).length)},{label:'DEAD MARKS',val:String((analysis.conflictAnalysis||[]).filter(c=>!String(c.status||'').toUpperCase().includes('LIVE')).length)},{label:'DATA SOURCE',val:usptoData.liveSearch?'LIVE':'AI ONLY'}].forEach((s,i)=>{
-    const x=margin+i*statW; doc.setFillColor(26,26,26); doc.rect(x,y,statW-1,16,'F');
-    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(232,255,71); doc.text(s.val,x+statW/2-2,y+9,{align:'center'});
-    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(100,100,100); doc.text(s.label,x+statW/2-2,y+14,{align:'center'});
-  }); y+=22;
-  if(analysis.distinctiveness){const lines=doc.splitTextToSize(`DISTINCTIVENESS: ${analysis.distinctiveness}`,contentW);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(150,150,150);doc.text(lines,margin,y);y+=lines.length*4+4;}
-  doc.setFillColor(15,15,15);doc.rect(margin,y,contentW,6,'F');doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(232,255,71);doc.text('AI RECOMMENDATION',margin+3,y+4);y+=8;
-  const recLines=doc.splitTextToSize(analysis.recommendation||'',contentW-6);doc.setFillColor(15,15,15);doc.rect(margin,y,contentW,recLines.length*4.5+6,'F');doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(220,220,220);doc.text(recLines,margin+3,y+5);y+=recLines.length*4.5+10;
-  if((analysis.mainRisks||[]).length>0){doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(100,100,100);doc.text('KEY RISK FACTORS',margin,y);y+=5;analysis.mainRisks.forEach(r=>{const rl=doc.splitTextToSize(`▸  ${r}`,contentW-4);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(180,180,180);doc.text(rl,margin+2,y);y+=rl.length*4+2;});y+=4;}
-  const cfls=analysis.conflictAnalysis||[];
-  if(cfls.length>0){if(y>220){doc.addPage();y=20;}doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(100,100,100);doc.text(`CONFLICT ANALYSIS (${cfls.length} MARKS)`,margin,y);y+=6;
-    cfls.forEach(c=>{if(y>260){doc.addPage();y=20;}const risk=(c.riskLevel||'medium').toUpperCase();const rColor=risk==='HIGH'?[255,71,71]:risk==='MEDIUM'?[255,204,71]:[71,255,138];const isLive=String(c.status||'').toUpperCase().includes('LIVE');
-      doc.setFillColor(17,17,17);doc.rect(margin,y,contentW,20,'F');doc.setFillColor(...rColor);doc.rect(margin,y,3,20,'F');
-      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(240,240,240);doc.text(c.markName||'N/A',margin+6,y+7);
-      doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(100,100,100);doc.text(`Serial: ${c.serialNumber||'N/A'}`,margin+6,y+12);
-      doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(...rColor);doc.text(`${risk} RISK`,W-margin-5,y+7,{align:'right'});
-      doc.setFont('helvetica','normal');doc.setTextColor(isLive?71:100,isLive?255:100,isLive?138:100);doc.text(isLive?'● LIVE':'○ DEAD',W-margin-5,y+13,{align:'right'});
-      const gt=(c.goodsServicesOverlap||'').substring(0,90);if(gt){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(130,130,130);doc.text(gt+(gt.length>=90?'...':''),margin+6,y+17);}
-      y+=22;});
+  const scoreColorHex = score >= 70 ? '#47ff8a' : score >= 40 ? '#ffcc47' : '#ff4747';
+  const white = [240,240,240];
+  const dimGray = [80,80,80];
+  const midGray = [120,120,120];
+
+  // ── Header bar
+  doc.setFillColor(10,10,10); doc.rect(0, 0, W, 30, 'F');
+  doc.setFillColor(...scoreColor); doc.rect(0, 0, 5, 30, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(232,255,71);
+  doc.text('TRADEMARKYO', margin, 12);
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...dimGray);
+  doc.text('USPTO TRADEMARK CLEARANCE REPORT', margin, 20);
+  doc.setFont('helvetica','normal'); doc.setTextColor(...midGray);
+  doc.text(`Generated: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`, margin, 27);
+  y = 40;
+
+  // ── Mark + Score block
+  doc.setFillColor(20,20,20); doc.rect(margin, y, contentW, 32, 'F');
+  doc.setFillColor(...scoreColor); doc.rect(margin, y, 4, 32, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...white);
+  doc.text(mark.toUpperCase(), margin + 10, y + 14);
+  if (classCode) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...midGray);
+    doc.text(`CLASS ${classCode}`, margin + 10, y + 22);
   }
-  doc.setFillColor(10,10,10);doc.rect(0,285,W,12,'F');doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(80,80,80);doc.text('NOT LEGAL ADVICE — This report is for informational purposes only. Consult a licensed trademark attorney before filing.',margin,292);doc.setTextColor(100,100,100);doc.text('trademarkyo.com',W-margin,292,{align:'right'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(32); doc.setTextColor(...scoreColor);
+  doc.text(String(score), W - margin - 28, y + 17);
+  doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(...dimGray);
+  doc.text('APPROVAL SCORE', W - margin - 30, y + 24);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...scoreColor);
+  const verdictText = (analysis.verdict||'').toUpperCase();
+  if (verdictText) doc.text(verdictText, W - margin - 5, y + 30, {align:'right'});
+  y += 38;
+
+  // ── Stats row
+  const statW = contentW / 4;
+  const stats = [
+    {label:'RECORDS REVIEWED', val:String(usptoData.totalFound||0)},
+    {label:'LIVE CONFLICTS', val:String((analysis.conflictAnalysis||[]).filter(c=>String(c.status||'').toUpperCase().includes('LIVE')).length)},
+    {label:'DEAD MARKS', val:String((analysis.conflictAnalysis||[]).filter(c=>!String(c.status||'').toUpperCase().includes('LIVE')).length)},
+    {label:'DATA SOURCE', val:usptoData.liveSearch?'LIVE':'AI ONLY'}
+  ];
+  stats.forEach((s,i) => {
+    const x = margin + i * statW;
+    doc.setFillColor(26,26,26); doc.rect(x, y, statW - 1, 18, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(232,255,71);
+    doc.text(s.val, x + statW/2 - 0.5, y + 10, {align:'center'});
+    doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(...dimGray);
+    doc.text(s.label, x + statW/2 - 0.5, y + 16, {align:'center'});
+  });
+  y += 24;
+
+  // ── Distinctiveness
+  if (analysis.distinctiveness) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...dimGray);
+    doc.text('DISTINCTIVENESS', margin, y); y += 5;
+    const dLines = doc.splitTextToSize(analysis.distinctiveness, contentW);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...midGray);
+    doc.text(dLines, margin, y); y += dLines.length * 4 + 6;
+  }
+
+  // ── Recommendation
+  doc.setFillColor(18,18,18); doc.rect(margin, y, contentW, 7, 'F');
+  doc.setFillColor(232,255,71); doc.rect(margin, y, 3, 7, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(232,255,71);
+  doc.text('AI RECOMMENDATION', margin + 6, y + 4.8); y += 9;
+  const recLines = doc.splitTextToSize(analysis.recommendation||'', contentW - 6);
+  doc.setFillColor(15,15,15); doc.rect(margin, y, contentW, recLines.length*4.8+8, 'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(210,210,210);
+  doc.text(recLines, margin + 4, y + 6); y += recLines.length * 4.8 + 14;
+
+  // ── Risk factors
+  if ((analysis.mainRisks||[]).length > 0) {
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...dimGray);
+    doc.text('KEY RISK FACTORS', margin, y); y += 6;
+    analysis.mainRisks.forEach(r => {
+      const rl = doc.splitTextToSize(`▸  ${r}`, contentW - 6);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(170,170,170);
+      doc.text(rl, margin + 3, y); y += rl.length * 4.2 + 2;
+    });
+    y += 6;
+  }
+
+  // ── Conflict Analysis
+  const cfls = analysis.conflictAnalysis || [];
+  if (cfls.length > 0) {
+    if (y > 220) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...dimGray);
+    doc.text(`CONFLICT ANALYSIS (${cfls.length} MARKS REVIEWED)`, margin, y); y += 7;
+    cfls.forEach(c => {
+      if (y > 258) { doc.addPage(); y = 20; }
+      const risk = (c.riskLevel||'medium').toUpperCase();
+      const rColor = risk==='HIGH'?[255,71,71]:risk==='MEDIUM'?[255,204,71]:[71,255,138];
+      const isLive = String(c.status||'').toUpperCase().includes('LIVE');
+      doc.setFillColor(20,20,20); doc.rect(margin, y, contentW, 22, 'F');
+      doc.setFillColor(...rColor); doc.rect(margin, y, 3, 22, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...white);
+      doc.text((c.markName||'N/A').toUpperCase(), margin + 7, y + 8);
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...dimGray);
+      doc.text(`Serial: ${c.serialNumber||'N/A'}`, margin + 7, y + 14);
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(...rColor);
+      doc.text(`${risk} RISK`, W - margin - 4, y + 8, {align:'right'});
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
+      doc.setTextColor(isLive?71:100, isLive?255:100, isLive?138:100);
+      doc.text(isLive?'● LIVE':'○ DEAD', W - margin - 4, y + 15, {align:'right'});
+      const gt = (c.goodsServicesOverlap||'').substring(0,95);
+      if (gt) {
+        doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...midGray);
+        doc.text(gt + (gt.length >= 95 ? '...' : ''), margin + 7, y + 20);
+      }
+      y += 25;
+    });
+  }
+
+  // ── Footer
+  doc.setFillColor(10,10,10); doc.rect(0, 285, W, 12, 'F');
+  doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...dimGray);
+  doc.text('NOT LEGAL ADVICE — For informational purposes only. Consult a licensed trademark attorney before filing.', margin, 292);
+  doc.setTextColor(90,90,90);
+  doc.text('trademarkyo.com', W - margin, 292, {align:'right'});
+
   doc.save(`Trademarkyo_${mark.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
@@ -466,6 +1132,7 @@ async function runScan() {
   _currentMark = mark; _currentClass = classCode;
   document.getElementById('suggestionsContainer').innerHTML = '';
   btn.disabled = true;
+  lockInputs();
   container.innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><div class="loading-text">Scanning USPTO Database</div><div class="loading-step" id="loadingStep">Connecting to live USPTO...</div></div>`;
   const updateStep = (msg) => { const el = document.getElementById('loadingStep'); if (el) el.textContent = msg; };
   try {
@@ -484,8 +1151,10 @@ async function runScan() {
     if (Number(analysis.approvalScore || 0) < 70) generateSuggestions(mark, classCode, analysis);
   } catch (err) {
     container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
+    unlockInputs();
   }
   btn.disabled = false;
+  // inputs stay locked after successful scan — user must refresh or click a suggestion
 }
 
 function renderResults(mark, classCode, usptoData, analysis) {
@@ -494,14 +1163,22 @@ function renderResults(mark, classCode, usptoData, analysis) {
   const scoreClass = score >= 70 ? 'score-green' : score >= 40 ? 'score-yellow' : 'score-red';
   const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
   const conflicts = Array.isArray(analysis.conflictAnalysis) ? analysis.conflictAnalysis : [];
-  const normalizedConflicts = conflicts.map(c => { const status = String(c.status || '').toUpperCase(); const isLive = status.includes('LIVE') || status === 'LIVE'; return { serialNumber: c.serialNumber || null, mark: c.markName || null, goods: c.goodsServicesOverlap || '', isLive, riskLevel: String(c.riskLevel || 'medium').toUpperCase(), reason: c.similarity || '' }; });
+  const normalizedConflicts = conflicts.map(c => {
+    const status = String(c.status || '').toUpperCase();
+    const isLive = status.includes('LIVE') || status === 'LIVE';
+    return { serialNumber: c.serialNumber || null, mark: c.markName || null, goods: c.goodsServicesOverlap || '', isLive, riskLevel: String(c.riskLevel || 'medium').toUpperCase(), reason: c.similarity || '' };
+  });
   _conflictStore = normalizedConflicts;
   const liveConflicts = normalizedConflicts.filter(c => c.isLive).length;
   const deadConflicts = normalizedConflicts.filter(c => !c.isLive).length;
   const conflictsHTML = normalizedConflicts.length > 0
-    ? `<div class="click-hint">Tap any row for full detail →</div>` + normalizedConflicts.map((c, i) => { const risk = c.riskLevel || 'MEDIUM'; const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low'; return `<div class="conflict-item" onclick="openModal(${i})"><div><div class="conflict-mark">${c.mark || 'N/A'}</div><div class="conflict-goods">${c.goods ? c.goods.substring(0,120)+(c.goods.length>120?'...':'') : 'No goods description'}</div></div><div><div class="conflict-serial">${c.serialNumber || ''}</div><div style="margin-top:0.3rem"><span class="status-tag ${c.isLive?'live':'dead'}">${c.isLive?'● LIVE':'○ DEAD'}</span></div></div><div style="text-align:right"><span class="risk-tag ${riskClass}">${risk} RISK</span>${c.reason?`<div style="font-size:0.65rem;color:var(--muted);margin-top:0.4rem;max-width:160px">${c.reason}</div>`:''}</div></div>`; }).join('')
+    ? `<div class="click-hint">Tap any row for full detail →</div>` + normalizedConflicts.map((c, i) => {
+        const risk = c.riskLevel || 'MEDIUM';
+        const riskClass = risk === 'HIGH' ? 'risk-high' : risk === 'MEDIUM' ? 'risk-med' : 'risk-low';
+        return `<div class="conflict-item" onclick="openModal(${i})"><div><div class="conflict-mark">${c.mark || 'N/A'}</div><div class="conflict-goods">${c.goods ? c.goods.substring(0,120)+(c.goods.length>120?'...':'') : 'No goods description'}</div></div><div><div class="conflict-serial">${c.serialNumber || ''}</div><div style="margin-top:0.3rem"><span class="status-tag ${c.isLive?'live':'dead'}">${c.isLive?'● LIVE':'○ DEAD'}</span></div></div><div style="text-align:right"><span class="risk-tag ${riskClass}">${risk} RISK</span>${c.reason?`<div style="font-size:0.62rem;color:var(--text-secondary);margin-top:0.4rem;max-width:160px">${c.reason}</div>`:''}</div></div>`;
+      }).join('')
     : '<div class="no-conflicts">✓ NO CONFLICTING MARKS IDENTIFIED</div>';
-  const risksHTML = (analysis.mainRisks || []).map(r => `<div style="padding:0.5rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--muted);display:flex;gap:0.75rem"><span style="color:var(--accent);flex-shrink:0">▸</span>${r}</div>`).join('');
+  const risksHTML = (analysis.mainRisks || []).map(r => `<div style="padding:0.55rem 0;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--text-secondary);display:flex;gap:0.75rem;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif"><span style="color:var(--accent);flex-shrink:0">▸</span>${r}</div>`).join('');
   const sourceTag = usptoData.liveSearch ? `<span class="source-tag source-live">● LIVE SEARCH</span>` : `<span class="source-tag source-ai">⚡ AI ONLY</span>`;
   const classLabel = classCode ? ` · Class ${classCode}` : '';
   container.innerHTML = `<div class="verdict-card">
@@ -509,12 +1186,12 @@ function renderResults(mark, classCode, usptoData, analysis) {
       <div>
         <div class="verdict-title">Mark Analyzed ${sourceTag}</div>
         <div class="verdict-mark">${mark}</div>
-        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);letter-spacing:0.1em">${analysis.distinctiveness||''}${classLabel}</div>
+        <div style="margin-top:0.5rem;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:0.6rem;color:var(--text-secondary);letter-spacing:0.1em;text-transform:uppercase">${analysis.distinctiveness||''}${classLabel}</div>
       </div>
       <div class="score-display">
         <span class="score-number ${scoreClass}">${score}</span>
         <span class="score-label">Approval Likelihood</span>
-        <div style="margin-top:0.5rem;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;color:${barColor}">${analysis.verdict||''}</div>
+        <div style="margin-top:0.5rem;font-family:Helvetica,'Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:${barColor}">${analysis.verdict||''}</div>
       </div>
     </div>
     <div class="verdict-bar"><div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div></div>
