@@ -1,5 +1,2 @@
-[phases.build]
-cmds = ["npm install --production"]
-
-[start]
-cmd = "node server.js"
+[phases.setup]
+nixPkgs = ["chromium"]
