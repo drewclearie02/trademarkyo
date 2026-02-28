@@ -31,50 +31,94 @@ function findChrome() {
   throw new Error('Chrome not found');
 }
 
-async function launchBrowser() {
-  const executablePath = findChrome();
-  console.log('[browser] Chrome:', executablePath);
-  return puppeteer.launch({
-    executablePath,
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process'],
-  });
+// ── Persistent browser instance ───────────────────────────────────────────────
+let browserInstance = null;
+let browserLaunching = false;
+
+async function getBrowser() {
+  if (browserInstance) {
+    try { await browserInstance.version(); return browserInstance; } catch { browserInstance = null; }
+  }
+  if (browserLaunching) {
+    while (browserLaunching) await sleep(200);
+    return browserInstance;
+  }
+  browserLaunching = true;
+  try {
+    const executablePath = findChrome();
+    console.log('[browser] Launching Chrome:', executablePath);
+    browserInstance = await puppeteer.launch({
+      executablePath,
+      headless: true,
+      args: [
+        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+        '--disable-gpu', '--no-zygote', '--single-process',
+        '--disable-extensions', '--disable-background-networking',
+      ],
+    });
+    browserInstance.on('disconnected', () => {
+      console.log('[browser] Disconnected - will relaunch on next request');
+      browserInstance = null;
+    });
+    console.log('[browser] Chrome ready');
+    return browserInstance;
+  } finally {
+    browserLaunching = false;
+  }
 }
 
-/**
- * Generate plural/singular/common variations of a mark name.
- * USPTO treats plural and singular forms as confusingly similar.
- * e.g. LEVEL -> [LEVEL, LEVELS], LEVELS -> [LEVELS, LEVEL]
- */
+// ── Search cache (24 hour TTL) ────────────────────────────────────────────────
+const searchCache = new Map();
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function getCacheKey(markName, classCode) {
+  return `${markName.toUpperCase()}::${classCode || ''}`;
+}
+
+function getCached(markName, classCode) {
+  const key = getCacheKey(markName, classCode);
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    searchCache.delete(key);
+    return null;
+  }
+  console.log(`[cache] HIT for "${markName}" (${searchCache.size} entries cached)`);
+  return entry.results;
+}
+
+function setCache(markName, classCode, results) {
+  const key = getCacheKey(markName, classCode);
+  searchCache.set(key, { results, timestamp: Date.now() });
+  console.log(`[cache] STORED "${markName}" (${searchCache.size} entries cached)`);
+  if (searchCache.size > 200) {
+    const oldest = [...searchCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+    searchCache.delete(oldest[0]);
+  }
+}
+
+// ── Mark variations ───────────────────────────────────────────────────────────
 function getMarkVariations(markName) {
   const base = markName.trim().toUpperCase();
   const variations = new Set([base]);
 
-  // Singular from plural: strip S or ES
   if (base.endsWith('IES') && base.length > 4) {
-    variations.add(base.slice(0, -3) + 'Y');   // PARTIES -> PARTY
+    variations.add(base.slice(0, -3) + 'Y');
   } else if (base.endsWith('ES') && base.length > 3) {
-    variations.add(base.slice(0, -2));           // BENCHES -> BENCH
-    variations.add(base.slice(0, -1));           // edge cases
+    variations.add(base.slice(0, -2));
   } else if (base.endsWith('S') && base.length > 2) {
-    variations.add(base.slice(0, -1));           // LEVELS -> LEVEL
+    variations.add(base.slice(0, -1));
   }
 
-  // Plural from singular
   if (!base.endsWith('S')) {
-    variations.add(base + 'S');                  // LEVEL -> LEVELS
-    if (/[XZ]$/.test(base) || /CH$/.test(base) || /SH$/.test(base)) {
-      variations.add(base + 'ES');               // BUZZ -> BUZZES
-    }
-    if (base.endsWith('Y') && base.length > 1) {
-      variations.add(base.slice(0, -1) + 'IES'); // PARTY -> PARTIES
-    }
+    variations.add(base + 'S');
+    if (/[XZ]$/.test(base) || /CH$/.test(base) || /SH$/.test(base)) variations.add(base + 'ES');
+    if (base.endsWith('Y') && base.length > 1) variations.add(base.slice(0, -1) + 'IES');
   }
 
-  // ING strip/add for single words
   if (base.endsWith('ING') && base.length > 4) {
-    variations.add(base.slice(0, -3));            // GLOWING -> GLOW
-    variations.add(base.slice(0, -3) + 'E');      // TRADING -> TRADE
+    variations.add(base.slice(0, -3));
+    variations.add(base.slice(0, -3) + 'E');
   } else if (!base.includes(' ') && base.length <= 8 && !base.endsWith('ING')) {
     variations.add(base + 'ING');
   }
@@ -82,42 +126,12 @@ function getMarkVariations(markName) {
   return [...variations].filter(v => v.length >= 2);
 }
 
-async function scrapeUsptoTrademark(markName, classCode) {
-  const browser = await launchBrowser();
-  const allResults = [];
-  const variations = getMarkVariations(markName);
-
-  console.log(`[scrape] Searching variations: ${variations.join(', ')}`);
-
-  try {
-    for (const variant of variations) {
-      const results = await scrapeVariant(browser, variant, classCode);
-      for (const r of results) {
-        r.matchedVariant = variant;
-        r.isVariation = variant !== markName.toUpperCase();
-      }
-      allResults.push(...results);
-    }
-  } finally {
-    await browser.close();
-  }
-
-  // Deduplicate by serial number
-  const seen = new Set();
-  const deduped = allResults.filter(r => {
-    if (seen.has(r.serialNumber)) return false;
-    seen.add(r.serialNumber);
-    return true;
-  });
-
-  console.log(`[scrape] Total unique results across all variations: ${deduped.length}`);
-  return deduped;
-}
-
+// ── Scrape a single variant ───────────────────────────────────────────────────
 async function scrapeVariant(browser, markName, classCode) {
   const results = [];
+  let page;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     page.setDefaultNavigationTimeout(60000);
     page.setDefaultTimeout(60000);
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36');
@@ -149,7 +163,6 @@ async function scrapeVariant(browser, markName, classCode) {
     await sleep(4000);
 
     if (classCode) {
-      console.log('[scrape] Applying class filter:', classCode);
       try {
         const classApplied = await page.evaluate((cls) => {
           const inputs = Array.from(document.querySelectorAll('input[type="checkbox"], input[type="radio"]'));
@@ -161,17 +174,14 @@ async function scrapeVariant(browser, markName, classCode) {
           if (classInput && !classInput.checked) { classInput.click(); return true; }
           return false;
         }, classCode);
-        console.log('[scrape] Class filter applied via UI:', classApplied);
         if (classApplied) await sleep(2000);
       } catch (e) {
-        console.log('[scrape] Could not apply class filter via UI:', e.message);
+        console.log('[scrape] Could not apply class filter:', e.message);
       }
     }
 
     try {
-      await page.waitForFunction(() => {
-        return document.body.innerText.match(/\b\d{8}\b/);
-      }, { timeout: 10000 });
+      await page.waitForFunction(() => document.body.innerText.match(/\b\d{8}\b/), { timeout: 10000 });
     } catch {
       console.log('[scrape] Timeout waiting for serial numbers');
     }
@@ -188,8 +198,7 @@ async function scrapeVariant(browser, markName, classCode) {
       const selectors = [
         'app-result-item', 'app-search-result', 'app-trademark-result',
         '[class*="result-item"]', '[class*="search-result"]',
-        'mat-list-item', 'mat-card',
-        'tbody tr', '[role="listitem"]', '[role="row"]',
+        'mat-list-item', 'mat-card', 'tbody tr', '[role="listitem"]', '[role="row"]',
       ];
       for (const sel of selectors) {
         const els = document.querySelectorAll(sel);
@@ -198,7 +207,7 @@ async function scrapeVariant(browser, markName, classCode) {
             const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
             if (text.length < 5) return;
             const serial = text.match(/\b(\d{8})\b/)?.[1];
-            items.push({ text: text.substring(0, 500), serial: serial || null, selector: sel });
+            items.push({ text: text.substring(0, 500), serial: serial || null });
           });
           if (items.length > 2) break;
         }
@@ -211,15 +220,10 @@ async function scrapeVariant(browser, markName, classCode) {
     if (itemsWithSerials.length > 0) {
       for (const r of itemsWithSerials) {
         results.push({
-          source: 'tmsearch',
-          serialNumber: r.serial,
+          source: 'tmsearch', serialNumber: r.serial,
           liveDeadStatus: /dead|abandon|cancel/i.test(r.text) ? 'DEAD' : 'LIVE',
-          markName: null,
-          owner: null,
-          goodsServices: r.text,
-          internationalClass: classCode || null,
-          filingDate: null,
-          registrationDate: null,
+          markName: null, owner: null, goodsServices: r.text,
+          internationalClass: classCode || null, filingDate: null, registrationDate: null,
         });
       }
     } else if (uniqueSerials.length > 0) {
@@ -227,29 +231,61 @@ async function scrapeVariant(browser, markName, classCode) {
         const idx = fullText.indexOf(serial);
         const context = fullText.substring(Math.max(0, idx - 100), idx + 300);
         results.push({
-          source: 'tmsearch',
-          serialNumber: serial,
+          source: 'tmsearch', serialNumber: serial,
           liveDeadStatus: /dead|abandon|cancel/i.test(context) ? 'DEAD' : 'LIVE',
-          markName: null,
-          owner: null,
-          goodsServices: context.replace(/\s+/g, ' ').trim(),
-          internationalClass: classCode || null,
-          filingDate: null,
-          registrationDate: null,
+          markName: null, owner: null, goodsServices: context.replace(/\s+/g, ' ').trim(),
+          internationalClass: classCode || null, filingDate: null, registrationDate: null,
         });
       }
     }
 
-    await page.close();
     console.log(`[scrape] Variant "${markName}" returning ${results.length} results`);
     return results;
   } catch (e) {
     console.log(`[scrape] Variant "${markName}" failed:`, e.message);
-    try { } catch { }
     return [];
+  } finally {
+    if (page) await page.close().catch(() => {});
   }
 }
 
+// ── Main scrape — parallel variations ─────────────────────────────────────────
+async function scrapeUsptoTrademark(markName, classCode) {
+  const cached = getCached(markName, classCode);
+  if (cached) return cached;
+
+  const browser = await getBrowser();
+  const variations = getMarkVariations(markName);
+  console.log(`[scrape] Searching ${variations.length} variations in parallel: ${variations.join(', ')}`);
+
+  // Run all variations concurrently instead of sequentially
+  const variantResults = await Promise.all(
+    variations.map(async (variant) => {
+      const results = await scrapeVariant(browser, variant, classCode);
+      return results.map(r => ({
+        ...r,
+        matchedVariant: variant,
+        isVariation: variant !== markName.toUpperCase(),
+      }));
+    })
+  );
+
+  const allResults = variantResults.flat();
+
+  // Deduplicate by serial number
+  const seen = new Set();
+  const deduped = allResults.filter(r => {
+    if (seen.has(r.serialNumber)) return false;
+    seen.add(r.serialNumber);
+    return true;
+  });
+
+  console.log(`[scrape] Total unique results: ${deduped.length}`);
+  setCache(markName, classCode, deduped);
+  return deduped;
+}
+
+// ── Claude analysis ───────────────────────────────────────────────────────────
 async function callClaude({ markName, classCode, results }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
@@ -260,7 +296,7 @@ async function callClaude({ markName, classCode, results }) {
 
   const variantCount = results.filter(r => r.isVariation).length;
   const variantNote = variantCount > 0
-    ? `\nIMPORTANT: ${variantCount} result(s) were found by searching plural/variation forms of the mark. Under established USPTO practice and DuPont factors, plural and singular forms of a mark are treated as confusingly similar. Weight these results accordingly in your risk analysis.`
+    ? `\nIMPORTANT: ${variantCount} result(s) were found by searching plural/variation forms of the mark. Under established USPTO practice and DuPont factors, plural and singular forms of a mark are treated as confusingly similar. Weight these results accordingly.`
     : '';
 
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -273,7 +309,7 @@ async function callClaude({ markName, classCode, results }) {
       system: 'You are a trademark clearance attorney assistant. Perform rigorous DuPont factor likelihood-of-confusion analysis. Return ONLY a raw JSON object. No markdown. No explanation.',
       messages: [{
         role: 'user',
-        content: `Analyze trademark risk for proposed mark: "${markName}".\n${classContext}${variantNote}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nPerform thorough DuPont analysis considering: similarity of marks (including plural/singular variations which USPTO treats as confusingly similar), relatedness of goods/services, strength of mark, actual confusion evidence, channels of trade.\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high","isVariation":boolean}]}`
+        content: `Analyze trademark risk for proposed mark: "${markName}".\n${classContext}${variantNote}\n\nUSPTO records found (${results.length}):\n${JSON.stringify(results, null, 2)}\n\nReturn ONLY this JSON:\n{"approvalScore":0-100,"verdict":"approve"|"caution"|"reject","distinctiveness":string,"mainRisks":string[],"recommendation":string,"conflictAnalysis":[{"serialNumber":string|null,"markName":string|null,"status":string|null,"similarity":string,"goodsServicesOverlap":string,"riskLevel":"low"|"medium"|"high","isVariation":boolean}]}`
       }]
     })
   });
@@ -282,12 +318,12 @@ async function callClaude({ markName, classCode, results }) {
   if (!resp.ok) throw new Error(`Claude API (${resp.status}): ${truncate(text, 250)}`);
   const parsed = safeJsonParse(text);
   const rawContent = parsed?.content?.[0]?.text || '';
-  const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-  const result = safeJsonParse(stripped);
+  const result = safeJsonParse(rawContent);
   if (!result) throw new Error('Claude returned invalid JSON');
   return result;
 }
 
+// ── Routes ────────────────────────────────────────────────────────────────────
 app.post('/api/search', async (req, res) => {
   const markName = String(req.body?.markName || '').trim();
   const classCode = String(req.body?.classCode || '').trim();
@@ -342,22 +378,26 @@ app.post('/api/suggest', async (req, res) => {
 
     const text = await resp.text();
     if (!resp.ok) throw new Error(`Claude API (${resp.status})`);
-
     const parsed = JSON.parse(text);
     const rawContent = parsed?.content?.[0]?.text || '';
     const stripped = rawContent.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-
     const result = safeJsonParse(stripped);
-    if (!result || !Array.isArray(result.suggestions)) {
-      throw new Error('Claude returned invalid JSON structure');
-    }
-
+    if (!result || !Array.isArray(result.suggestions)) throw new Error('Claude returned invalid JSON structure');
     return res.json(result);
   } catch (e) {
     return res.status(500).json({ error: 'Suggestion failed', message: String(e?.message || e) });
   }
 });
 
-app.get('/health', (_req, res) => res.json({ ok: true }));
+app.get('/health', (_req, res) => res.json({ ok: true, cacheSize: searchCache.size }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.listen(PORT, () => console.log(`Trademarkyo running on port ${PORT}`));
+
+app.listen(PORT, async () => {
+  console.log(`Trademarkyo running on port ${PORT}`);
+  try {
+    await getBrowser();
+    console.log('[browser] Pre-warmed and ready');
+  } catch (e) {
+    console.error('[browser] Pre-warm failed:', e.message);
+  }
+});
