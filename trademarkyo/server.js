@@ -116,11 +116,10 @@ function getMarkVariations(markName) {
     if (base.endsWith('Y') && base.length > 1) variations.add(base.slice(0, -1) + 'IES');
   }
 
+  // ING stripping only (e.g. GLOWING -> GLOW) — never ADD ING, it's not legally relevant for confusion
   if (base.endsWith('ING') && base.length > 4) {
     variations.add(base.slice(0, -3));
     variations.add(base.slice(0, -3) + 'E');
-  } else if (!base.includes(' ') && base.length <= 8 && !base.endsWith('ING')) {
-    variations.add(base + 'ING');
   }
 
   return [...variations].filter(v => v.length >= 2);
@@ -139,9 +138,8 @@ async function scrapeVariant(browser, markName, classCode) {
     await page.goto('https://tmsearch.uspto.gov/search/search-information', {
       waitUntil: 'networkidle2', timeout: 45000
     });
-    await sleep(2000);
-
-    await page.waitForSelector('#searchbar', { timeout: 10000 });
+    // Wait for searchbar to appear instead of fixed 2s sleep
+    await page.waitForSelector('#searchbar', { timeout: 15000 });
     await page.click('#searchbar');
     await page.keyboard.down('Control');
     await page.keyboard.press('a');
@@ -160,7 +158,11 @@ async function scrapeVariant(browser, markName, classCode) {
     });
     if (!btnClicked) await page.keyboard.press('Enter');
 
-    await sleep(4000);
+    // Wait for results to start appearing instead of fixed 4s sleep
+    await page.waitForFunction(
+      () => document.body.innerText.match(/\b\d{8}\b/) || document.body.innerText.match(/no results|0 results|not found/i),
+      { timeout: 15000 }
+    ).catch(() => {}); // don't throw if nothing found, just proceed
 
     if (classCode) {
       try {
@@ -174,19 +176,20 @@ async function scrapeVariant(browser, markName, classCode) {
           if (classInput && !classInput.checked) { classInput.click(); return true; }
           return false;
         }, classCode);
-        if (classApplied) await sleep(2000);
+        if (classApplied) {
+          // Wait for results to refresh after filter instead of fixed 2s sleep
+          await page.waitForFunction(
+            () => document.body.innerText.match(/\b\d{8}\b/) || document.body.innerText.match(/no results|0 results|not found/i),
+            { timeout: 8000 }
+          ).catch(() => {});
+        }
       } catch (e) {
         console.log('[scrape] Could not apply class filter:', e.message);
       }
     }
 
-    try {
-      await page.waitForFunction(() => document.body.innerText.match(/\b\d{8}\b/), { timeout: 10000 });
-    } catch {
-      console.log('[scrape] Timeout waiting for serial numbers');
-    }
-
-    await sleep(2000);
+    // Small buffer to ensure DOM is fully populated after results appear
+    await sleep(500);
 
     const fullText = await page.evaluate(() => document.body?.innerText || '');
     const serialMatches = [...fullText.matchAll(/\b(\d{8})\b/g)].map(m => m[1]);
