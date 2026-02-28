@@ -424,7 +424,65 @@ app.post('/api/suggest', async (req, res) => {
     return res.status(500).json({ error: 'Suggestion failed', message: String(e?.message || e) });
   }
 });
+app.post('/api/draft', async (req, res) => {
+  const markName = String(req.body?.markName || '').trim();
+  const classCode = String(req.body?.classCode || '').trim();
+  const productContext = String(req.body?.productContext || '').trim();
+  const analysis = req.body?.analysis || {};
 
+  if (!markName) return res.status(400).json({ error: 'markName required' });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        temperature: 0.2,
+        system: 'You are a USPTO trademark attorney. Generate precise, legally accurate TEAS application draft content. The goods and services description must match USPTO ID Manual style — specific, not vague. Return ONLY a raw JSON object. No markdown. No backticks. No explanation.',
+        messages: [{
+          role: 'user',
+          content: `Generate a USPTO TEAS application draft for the following mark.
+
+Mark: "${markName}"
+International Class: ${classCode || 'not specified'}
+Product/Service Description: ${productContext || 'not provided'}
+AI Analysis Summary: ${analysis.recommendation || 'not provided'}
+Distinctiveness: ${analysis.distinctiveness || 'not provided'}
+
+Return ONLY this JSON:
+{
+  "summary": "2-3 sentence plain English overview of this application",
+  "goodsServicesDescription": "USPTO ID Manual style description of the goods/services. Must be specific and legally precise. Example: 'Computer software for tracking invoices, expenses, and payments for freelancers and small businesses'",
+  "filingBasis": "Section 1(a) — Use in Commerce OR Section 1(b) — Intent to Use, with one sentence explanation of which applies and why",
+  "ownershipNote": "Guidance on how to fill in the owner field based on common entity types",
+  "specimenGuidance": "Specific guidance on what specimen to submit for this type of mark and goods/services",
+  "disclaimerSuggestion": "Any descriptive terms in the mark that should be disclaimed, or empty string if none",
+  "filingSteps": [
+    "Step text here — can include HTML links",
+    "..."
+  ],
+  "additionalNotes": "Any other relevant notes for this specific application"
+}`
+        }]
+      })
+    });
+
+    const text = await resp.text();
+    if (!resp.ok) throw new Error(`Claude API (${resp.status}): ${truncate(text, 250)}`);
+    const parsed = safeJsonParse(text);
+    const rawContent = parsed?.content?.[0]?.text || '';
+    const result = safeJsonParse(rawContent);
+    if (!result) throw new Error('Claude returned invalid JSON');
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ error: 'Draft generation failed', message: String(e?.message || e) });
+  }
+});
 app.get('/health', (_req, res) => res.json({ ok: true, cacheSize: searchCache.size }));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
