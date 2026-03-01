@@ -57,6 +57,8 @@
   .btn-scan:hover { background: #fff; }
   .btn-scan:active { transform: scale(0.99); }
   .btn-scan:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+  .btn-new-search { width: 100%; background: #2a2a2a; color: var(--text-secondary); border: none; font-weight: 700; font-size: 1rem; letter-spacing: 0.2em; text-transform: uppercase; padding: 1.15rem; cursor: pointer; transition: all 0.15s; font-family: inherit; margin-top: 0.6rem; display: none; }
+  .btn-new-search:hover { background: #3a3a3a; color: var(--text); }
 
   /* RESULTS */
   .results-container { max-width: 1200px; margin: 0 auto; padding: 0 3rem 2rem; }
@@ -388,6 +390,7 @@
     <div class="context-hint">The more detail you provide, the more accurate the conflict analysis and the better the USPTO application draft will be. Include what your product does, who it's for, and how it's sold or delivered.</div>
 
     <button class="btn-scan" id="scanBtn" onclick="runScan()">ANALYZE WITH AI →</button>
+    <button class="btn-new-search" id="newSearchBtn" onclick="resetSearch()">↺ NEW SEARCH</button>
   </div>
 </div>
 
@@ -541,6 +544,7 @@ async function runScan() {
     renderResults(mark, classCode, usptoData, analysis);
     if (Number(analysis.approvalScore || 0) < 70) generateSuggestions(mark, classCode, analysis);
     showDraftTrigger(mark, classCode, context, analysis);
+    document.getElementById('newSearchBtn').style.display = 'block';
 
   } catch (err) {
     container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
@@ -712,7 +716,7 @@ function showDraftTrigger(mark, classCode, context, analysis) {
   section.innerHTML = `<div class="draft-trigger-card">
     <div class="draft-trigger-text">
       <h3>Generate USPTO Application Draft</h3>
-      <p>${msg} The draft includes a ready-to-paste goods &amp; services description, filing basis, ownership notes, specimen guidance, and step-by-step TEAS filing instructions — everything you need to file without an attorney.</p>
+      <p>${msg} The draft includes a ready-to-paste goods &amp; services description, filing basis, ownership notes, specimen guidance, and step-by-step TEAS filing instructions — to assist you through the application process.</p>
     </div>
     <button class="btn-draft" id="draftBtn" onclick="generateDraft()">GENERATE DRAFT →</button>
   </div>`;
@@ -1044,6 +1048,22 @@ function downloadDraftPDF() {
 }
 
 document.getElementById('markInput').addEventListener('keypress', e => { if (e.key === 'Enter') runScan(); });
+
+function resetSearch() {
+  unlockInputs();
+  document.getElementById('markInput').value = '';
+  document.getElementById('classSelect').value = '';
+  document.getElementById('contextInput').value = '';
+  document.getElementById('resultsContainer').innerHTML = '';
+  document.getElementById('suggestionsContainer').innerHTML = '';
+  document.getElementById('draftContainer').innerHTML = '';
+  document.getElementById('draftTriggerSection').style.display = 'none';
+  document.getElementById('draftTriggerSection').innerHTML = '';
+  document.getElementById('newSearchBtn').style.display = 'none';
+  document.getElementById('markInput').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  _lastScanData = null; _currentAnalysis = null; _currentMark = ''; _currentClass = ''; _currentContext = '';
+}
 </script>
 </body>
 </html>
