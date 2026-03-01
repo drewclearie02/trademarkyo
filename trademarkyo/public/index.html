@@ -98,6 +98,39 @@
   .score-breakdown-note { font-size: 0.78rem; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 0.5rem; }
   @media (max-width: 640px) { .dupont-grid { grid-template-columns: 1fr; } }
 
+  /* SEARCH HISTORY */
+  .history-panel { max-width: 1200px; margin: 0 auto; padding: 0 3rem 1.5rem; }
+  .history-inner { border: 1px solid var(--border); background: var(--surface); }
+  .history-header { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border); }
+  .history-title { font-weight: 700; font-size: 0.6rem; color: var(--muted); letter-spacing: 0.2em; text-transform: uppercase; }
+  .history-clear { background: none; border: none; font-weight: 700; font-size: 0.55rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; font-family: inherit; transition: color 0.15s; }
+  .history-clear:hover { color: var(--red); }
+  .history-list { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.9rem 1.25rem; }
+  .history-item { display: flex; align-items: center; gap: 0.6rem; background: var(--bg); border: 1px solid var(--border); padding: 0.45rem 0.9rem; cursor: pointer; transition: all 0.15s; }
+  .history-item:hover { border-color: var(--accent); }
+  .history-item:hover .history-item-mark { color: var(--accent); }
+  .history-item-mark { font-weight: 700; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; transition: color 0.15s; }
+  .history-item-score { font-weight: 700; font-size: 0.6rem; padding: 0.15rem 0.4rem; }
+  .history-item-class { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.06em; }
+
+  /* CLASS SHORTCUT */
+  .class-shortcut { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+  .class-shortcut-label { font-weight: 700; font-size: 0.6rem; color: var(--text-secondary); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 0.75rem; display: block; }
+  .class-shortcut-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .class-chip { background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary); font-weight: 700; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.45rem 0.9rem; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+  .class-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .class-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.06); }
+
+  /* VARIATIONS SEARCHED */
+  .variations-searched { margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+  .variations-label { font-weight: 700; font-size: 0.55rem; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; flex-shrink: 0; }
+  .variation-tag { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; color: var(--muted); background: var(--surface2); border: 1px solid var(--border); padding: 0.2rem 0.5rem; text-transform: uppercase; }
+
+  @media (max-width: 640px) {
+    .history-panel { padding: 0 1.25rem 1.5rem; }
+    .class-shortcut-chips { gap: 0.4rem; }
+  }
+
   /* RESULTS */
   .results-container { max-width: 1200px; margin: 0 auto; padding: 0 3rem 2rem; }
   .verdict-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.4s ease forwards; }
@@ -468,6 +501,21 @@
 
     <button class="btn-scan" id="scanBtn" onclick="runScan()">ANALYZE WITH AI →</button>
     <button class="btn-new-search" id="newSearchBtn" onclick="resetSearch()">↺ NEW SEARCH</button>
+
+    <div class="class-shortcut" id="classShortcut" style="display:none">
+      <span class="class-shortcut-label">Scan this mark in another class</span>
+      <div class="class-shortcut-chips" id="classChips"></div>
+    </div>
+  </div>
+</div>
+
+<div class="history-panel" id="historyPanel" style="display:none">
+  <div class="history-inner">
+    <div class="history-header">
+      <span class="history-title">Recent Searches</span>
+      <button class="history-clear" onclick="clearHistory()">CLEAR</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
   </div>
 </div>
 
@@ -509,6 +557,110 @@ function toggleDupont() {
   toggle.classList.toggle('open');
 }
 
+/* ── SEARCH HISTORY ── */
+const CLASS_NAMES = {'1':'Chemicals','2':'Paints','3':'Cosmetics','4':'Lubricants','5':'Pharma','6':'Metal','7':'Machinery','8':'Tools','9':'Electronics','10':'Medical','11':'Lighting','12':'Vehicles','13':'Firearms','14':'Jewelry','15':'Instruments','16':'Print','17':'Rubber','18':'Leather','19':'Building','20':'Furniture','21':'Housewares','22':'Ropes','23':'Yarns','24':'Textiles','25':'Clothing','26':'Lace','27':'Flooring','28':'Sporting','29':'Food','30':'Staple Food','31':'Fresh Food','32':'Beverages','33':'Alcohol','34':'Tobacco','35':'Advertising','36':'Finance','37':'Construction','38':'Telecom','39':'Transport','40':'Materials','41':'Education','42':'Software','43':'Hospitality','44':'Health','45':'Legal'};
+
+function addToHistory(mark, classCode, analysis) {
+  const score = Number(analysis.approvalScore || 0);
+  let history = JSON.parse(sessionStorage.getItem('tyo_history') || '[]');
+  // Remove duplicate if same mark+class already in history
+  history = history.filter(h => !(h.mark === mark && h.classCode === classCode));
+  history.unshift({ mark, classCode, score, ts: Date.now() });
+  if (history.length > 10) history = history.slice(0, 10);
+  sessionStorage.setItem('tyo_history', JSON.stringify(history));
+}
+
+function renderHistory() {
+  const history = JSON.parse(sessionStorage.getItem('tyo_history') || '[]');
+  const panel = document.getElementById('historyPanel');
+  const list = document.getElementById('historyList');
+  if (!history.length) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  list.innerHTML = history.map(h => {
+    const sc = h.score >= 75 ? 'var(--green)' : h.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const classLabel = h.classCode ? `· Class ${h.classCode}` : '';
+    return `<div class="history-item" onclick="runHistorySearch('${h.mark}','${h.classCode}')">
+      <span class="history-item-mark">${h.mark}</span>
+      ${h.classCode ? `<span class="history-item-class">${classLabel}</span>` : ''}
+      <span class="history-item-score" style="color:${sc};background:rgba(0,0,0,0.3);border:1px solid ${sc}">${h.score}%</span>
+    </div>`;
+  }).join('');
+}
+
+function runHistorySearch(mark, classCode) {
+  unlockInputs();
+  document.getElementById('markInput').value = mark;
+  document.getElementById('classSelect').value = classCode;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => runScan(), 200);
+}
+
+function clearHistory() {
+  sessionStorage.removeItem('tyo_history');
+  document.getElementById('historyPanel').style.display = 'none';
+}
+
+/* ── CLASS SHORTCUT ── */
+const COMMON_CLASSES = [
+  {code:'9', label:'Class 9 — Electronics & Software'},
+  {code:'25', label:'Class 25 — Clothing'},
+  {code:'35', label:'Class 35 — Advertising & Business'},
+  {code:'42', label:'Class 42 — Software & Tech'},
+  {code:'41', label:'Class 41 — Education & Entertainment'},
+  {code:'44', label:'Class 44 — Health Services'},
+  {code:'43', label:'Class 43 — Food & Lodging'},
+  {code:'3', label:'Class 3 — Cosmetics'},
+  {code:'5', label:'Class 5 — Pharma & Supplements'},
+  {code:'36', label:'Class 36 — Financial Services'},
+];
+
+function showClassShortcut(mark, currentClass) {
+  const shortcut = document.getElementById('classShortcut');
+  const chips = document.getElementById('classChips');
+  // Show 6 classes that aren't the current one
+  const toShow = COMMON_CLASSES.filter(c => c.code !== currentClass).slice(0, 6);
+  chips.innerHTML = toShow.map(c =>
+    `<button class="class-chip" onclick="scanInClass('${mark}','${c.code}')">${c.label}</button>`
+  ).join('');
+  // Also add "All Classes" if a class is currently selected
+  if (currentClass) {
+    chips.innerHTML = `<button class="class-chip" onclick="scanInClass('${mark}','')">All Classes</button>` + chips.innerHTML;
+  }
+  shortcut.style.display = 'block';
+}
+
+function scanInClass(mark, classCode) {
+  unlockInputs();
+  document.getElementById('markInput').value = mark;
+  document.getElementById('classSelect').value = classCode;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => runScan(), 200);
+}
+
+/* ── VARIATION TAGS ── */
+function populateVariationTags(mark) {
+  const base = mark.toUpperCase().trim();
+  const variations = new Set([base]);
+  if (base.endsWith('IES') && base.length > 4) variations.add(base.slice(0,-3)+'Y');
+  else if (base.endsWith('ES') && base.length > 3) variations.add(base.slice(0,-2));
+  else if (base.endsWith('S') && base.length > 2) variations.add(base.slice(0,-1));
+  if (!base.endsWith('S')) {
+    variations.add(base+'S');
+    if (base.endsWith('Y') && base.length > 1) variations.add(base.slice(0,-1)+'IES');
+  }
+  if (base.endsWith('ING') && base.length > 4) { variations.add(base.slice(0,-3)); variations.add(base.slice(0,-3)+'E'); }
+  variations.delete(base);
+  const container = document.getElementById('variationTags');
+  if (container) {
+    container.innerHTML = [...variations].filter(v=>v.length>=2).map(v =>
+      `<span class="variation-tag">${v}</span>`
+    ).join('');
+    if (!variations.size) {
+      document.getElementById('variationsRow').style.display = 'none';
+    }
+  }
+}
+
 function checkPass() {
   const val = document.getElementById('passInput').value;
   const err = document.getElementById('gateError');
@@ -532,6 +684,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   document.getElementById('passInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkPass(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  renderHistory();
 });
 
 /* ── STATE ── */
@@ -649,6 +802,10 @@ async function runScan() {
     if (Number(analysis.approvalScore || 0) < 70) generateSuggestions(mark, classCode, analysis);
     showDraftTrigger(mark, classCode, context, analysis);
     document.getElementById('newSearchBtn').style.display = 'block';
+    addToHistory(mark, classCode, analysis);
+    showClassShortcut(mark, classCode);
+    renderHistory();
+    populateVariationTags(mark);
 
   } catch (err) {
     container.innerHTML = `<div class="error-box">ERROR: ${err.message}<br><br>Please try again in a moment.</div>`;
@@ -780,6 +937,11 @@ function renderResults(mark, classCode, usptoData, analysis) {
       </button>
     </div>
     ${conflictsHTML}
+    <div class="variations-searched" id="variationsRow" style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border)">
+      <span class="variations-label">Also Searched</span>
+      <span id="variationTags" style="display:flex;gap:0.4rem;flex-wrap:wrap"></span>
+      <span style="margin-left:auto;font-size:0.55rem;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;flex-shrink:0">Searched ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})} at ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span>
+    </div>
   </div>`;
 
   setTimeout(() => {
@@ -978,7 +1140,9 @@ function downloadClearancePDF() {
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(80,80,80);
   doc.text('USPTO Trademark Clearance Report', M, y);
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(80,80,80);
-  doc.text(new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}), W-M, y, {align:'right'});
+  const _now = new Date();
+  const _ts = `${_now.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})} at ${_now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+  doc.text(_ts, W-M, y, {align:'right'});
   y += 10;
 
   // Divider
@@ -998,6 +1162,22 @@ function downloadClearancePDF() {
   if (analysis.verdict) {
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...barColor);
     doc.text(analysis.verdict.toUpperCase(), W-M, y, {align:'right'});
+  }
+  y += 7;
+
+  // Variations searched
+  const _base = mark.toUpperCase().trim();
+  const _vars = new Set();
+  if (_base.endsWith('IES') && _base.length>4) _vars.add(_base.slice(0,-3)+'Y');
+  else if (_base.endsWith('ES') && _base.length>3) _vars.add(_base.slice(0,-2));
+  else if (_base.endsWith('S') && _base.length>2) _vars.add(_base.slice(0,-1));
+  if (!_base.endsWith('S')) { _vars.add(_base+'S'); if (_base.endsWith('Y')&&_base.length>1) _vars.add(_base.slice(0,-1)+'IES'); }
+  if (_base.endsWith('ING')&&_base.length>4) { _vars.add(_base.slice(0,-3)); _vars.add(_base.slice(0,-3)+'E'); }
+  _vars.delete(_base);
+  const _varList = [..._vars].filter(v=>v.length>=2);
+  if (_varList.length) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100);
+    doc.text(`Also searched: ${_varList.join(', ')}`, M, y);
   }
   y += 10;
 
@@ -1115,7 +1295,8 @@ function downloadDraftPDF() {
   doc.text('TRADEMARKYO', M, y); y += 7;
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(80,80,80);
   doc.text('USPTO Application Draft', M, y);
-  doc.text(new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}), W-M, y, {align:'right'});
+  const _dNow = new Date();
+  doc.text(`${_dNow.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})} at ${_dNow.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`, W-M, y, {align:'right'});
   y += 10;
 
   doc.setDrawColor(0,0,0); doc.setLineWidth(0.5); doc.line(M, y, W-M, y); y += 10;
@@ -1201,6 +1382,7 @@ function resetSearch() {
   document.getElementById('draftTriggerSection').style.display = 'none';
   document.getElementById('draftTriggerSection').innerHTML = '';
   document.getElementById('newSearchBtn').style.display = 'none';
+  document.getElementById('classShortcut').style.display = 'none';
   document.getElementById('markInput').focus();
   window.scrollTo({ top: 0, behavior: 'smooth' });
   _lastScanData = null; _currentAnalysis = null; _currentMark = ''; _currentClass = ''; _currentContext = '';
