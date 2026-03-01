@@ -60,6 +60,44 @@
   .btn-new-search { width: 100%; background: #2a2a2a; color: var(--text-secondary); border: none; font-weight: 700; font-size: 1rem; letter-spacing: 0.2em; text-transform: uppercase; padding: 1.15rem; cursor: pointer; transition: all 0.15s; font-family: inherit; margin-top: 0.6rem; display: none; }
   .btn-new-search:hover { background: #3a3a3a; color: var(--text); }
 
+  /* DISCLAIMER MODAL */
+  #disclaimerModal { position: fixed; inset: 0; z-index: 9998; display: none; align-items: center; justify-content: center; padding: 1.5rem; }
+  #disclaimerModal.open { display: flex; }
+  .disclaimer-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(6px); }
+  .disclaimer-box { position: relative; background: var(--surface); border: 1px solid var(--border-light); width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.25s ease forwards; }
+  .disclaimer-box::before { content: ''; position: absolute; top: -1px; left: 0; width: 5rem; height: 3px; background: var(--red); }
+  .disclaimer-modal-header { padding: 2rem 2rem 1.5rem; border-bottom: 1px solid var(--border); }
+  .disclaimer-modal-title { font-weight: 700; font-size: 1.3rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.4rem; }
+  .disclaimer-modal-sub { font-size: 0.8rem; color: var(--text-secondary); letter-spacing: 0.06em; }
+  .disclaimer-modal-body { padding: 2rem; }
+  .disclaimer-item { display: flex; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .disclaimer-item:last-of-type { border-bottom: none; }
+  .disclaimer-item-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.1rem; }
+  .disclaimer-item-text { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.65; }
+  .disclaimer-item-text strong { color: var(--text); }
+  .disclaimer-checkbox-row { display: flex; align-items: flex-start; gap: 1rem; margin-top: 1.5rem; padding: 1.25rem; background: var(--bg); border: 1px solid var(--border); cursor: pointer; }
+  .disclaimer-checkbox-row input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 0.15rem; accent-color: var(--accent); cursor: pointer; }
+  .disclaimer-checkbox-label { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; cursor: pointer; }
+  .disclaimer-checkbox-label strong { color: var(--text); }
+  .disclaimer-accept-btn { width: 100%; background: var(--accent); color: #000; border: none; font-weight: 700; font-size: 0.9rem; letter-spacing: 0.2em; text-transform: uppercase; padding: 1.15rem; cursor: pointer; transition: all 0.15s; margin-top: 1rem; font-family: inherit; opacity: 0.4; pointer-events: none; }
+  .disclaimer-accept-btn.enabled { opacity: 1; pointer-events: all; }
+  .disclaimer-accept-btn.enabled:hover { background: #fff; }
+
+  /* SCORE BREAKDOWN */
+  .score-breakdown { margin-top: 1.5rem; }
+  .score-breakdown-toggle { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 0.6rem; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; transition: color 0.15s; }
+  .score-breakdown-toggle:hover { color: var(--text-secondary); }
+  .score-breakdown-toggle svg { width: 10px; height: 10px; transition: transform 0.2s; }
+  .score-breakdown-toggle.open svg { transform: rotate(180deg); }
+  .score-breakdown-panel { display: none; margin-top: 1rem; background: var(--bg); border: 1px solid var(--border); padding: 1.5rem; }
+  .score-breakdown-panel.open { display: block; }
+  .dupont-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+  .dupont-factor { padding: 0.9rem 1rem; background: var(--surface2); border: 1px solid var(--border); }
+  .dupont-factor-name { font-weight: 700; font-size: 0.6rem; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.3rem; }
+  .dupont-factor-desc { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
+  .score-breakdown-note { font-size: 0.78rem; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 0.5rem; }
+  @media (max-width: 640px) { .dupont-grid { grid-template-columns: 1fr; } }
+
   /* RESULTS */
   .results-container { max-width: 1200px; margin: 0 auto; padding: 0 3rem 2rem; }
   .verdict-card { background: var(--surface); border: 1px solid var(--border); padding: 2.5rem; margin-bottom: 2rem; animation: slideUp 0.4s ease forwards; }
@@ -283,6 +321,45 @@
   </div>
 </div>
 
+<!-- DISCLAIMER MODAL -->
+<div id="disclaimerModal">
+  <div class="disclaimer-backdrop"></div>
+  <div class="disclaimer-box">
+    <div class="disclaimer-modal-header">
+      <div class="disclaimer-modal-title">⚠ Important — Please Read Before Continuing</div>
+      <div class="disclaimer-modal-sub">This tool provides AI-assisted trademark research. It is not a law firm.</div>
+    </div>
+    <div class="disclaimer-modal-body">
+      <div class="disclaimer-item">
+        <div class="disclaimer-item-icon">⚖️</div>
+        <div class="disclaimer-item-text"><strong>Not Legal Advice.</strong> The analysis, approval scores, conflict assessments, and application drafts generated by this tool are for informational and research purposes only. Nothing on this platform constitutes legal advice or creates an attorney-client relationship.</div>
+      </div>
+      <div class="disclaimer-item">
+        <div class="disclaimer-item-icon">📊</div>
+        <div class="disclaimer-item-text"><strong>Scores Are Estimates.</strong> The approval likelihood score is generated by AI based on USPTO database records and DuPont factor analysis. It is an estimate only — not a guarantee of registration or a prediction of USPTO examiner decisions.</div>
+      </div>
+      <div class="disclaimer-item">
+        <div class="disclaimer-item-icon">🗄️</div>
+        <div class="disclaimer-item-text"><strong>Incomplete Data.</strong> This tool searches the USPTO federal trademark database only. It does not cover common law trademark rights, state registrations, or unregistered marks that may still hold legal protection in their geographic area.</div>
+      </div>
+      <div class="disclaimer-item">
+        <div class="disclaimer-item-icon">📝</div>
+        <div class="disclaimer-item-text"><strong>Draft Applications Require Review.</strong> Any USPTO application draft generated by this tool is a starting point only. You are solely responsible for reviewing, verifying, and correcting all information before submitting any application to the USPTO.</div>
+      </div>
+      <div class="disclaimer-item">
+        <div class="disclaimer-item-icon">👨‍⚖️</div>
+        <div class="disclaimer-item-text"><strong>Consult an Attorney.</strong> For marks with significant business value, complex conflicts, or international use, we strongly recommend consulting a licensed trademark attorney before filing.</div>
+      </div>
+
+      <label class="disclaimer-checkbox-row" for="disclaimerCheck">
+        <input type="checkbox" id="disclaimerCheck" onchange="toggleDisclaimerBtn(this)" />
+        <span class="disclaimer-checkbox-label">I understand that <strong>Trademarkyo is not a law firm</strong>, this tool does not provide legal advice, and all results are estimates for research purposes only. I accept full responsibility for any decisions made based on this tool's output.</span>
+      </label>
+      <button class="disclaimer-accept-btn" id="disclaimerAcceptBtn" onclick="acceptDisclaimer()">I UNDERSTAND — CONTINUE →</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFLICT MODAL -->
 <div id="markModal">
   <div class="modal-backdrop" onclick="closeModal()"></div>
@@ -407,6 +484,31 @@
 
 <script>
 /* ── AUTH ── */
+/* ── DISCLAIMER ── */
+function toggleDisclaimerBtn(checkbox) {
+  const btn = document.getElementById('disclaimerAcceptBtn');
+  if (checkbox.checked) btn.classList.add('enabled');
+  else btn.classList.remove('enabled');
+}
+function acceptDisclaimer() {
+  document.getElementById('disclaimerModal').classList.remove('open');
+  sessionStorage.setItem('tyo_disclaimer', '1');
+}
+function showDisclaimerIfNeeded() {
+  if (!sessionStorage.getItem('tyo_disclaimer')) {
+    document.getElementById('disclaimerModal').classList.add('open');
+  }
+}
+
+/* ── DUPONT TOGGLE ── */
+function toggleDupont() {
+  const panel = document.getElementById('dupontPanel');
+  const toggle = document.getElementById('dupontToggle');
+  if (!panel || !toggle) return;
+  panel.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
 function checkPass() {
   const val = document.getElementById('passInput').value;
   const err = document.getElementById('gateError');
@@ -414,6 +516,7 @@ function checkPass() {
     document.getElementById('passGate').classList.add('hidden');
     document.getElementById('appContent').classList.add('visible');
     sessionStorage.setItem('tyo_auth', '1');
+    showDisclaimerIfNeeded();
   } else {
     err.textContent = 'Incorrect code. Try again.';
     const inp = document.getElementById('passInput');
@@ -425,6 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem('tyo_auth') === '1') {
     document.getElementById('passGate').classList.add('hidden');
     document.getElementById('appContent').classList.add('visible');
+    showDisclaimerIfNeeded();
   }
   document.getElementById('passInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkPass(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
@@ -619,6 +723,43 @@ function renderResults(mark, classCode, usptoData, analysis) {
       </div>
     </div>
     <div class="verdict-bar"><div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div></div>
+    <div class="score-breakdown">
+      <button class="score-breakdown-toggle" id="dupontToggle" onclick="toggleDupont()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        HOW IS THIS SCORE CALCULATED?
+      </button>
+      <div class="score-breakdown-panel" id="dupontPanel">
+        <div class="dupont-grid">
+          <div class="dupont-factor">
+            <div class="dupont-factor-name">Similarity of the Marks</div>
+            <div class="dupont-factor-desc">How visually, phonetically, and conceptually similar is your proposed mark to existing registered marks?</div>
+          </div>
+          <div class="dupont-factor">
+            <div class="dupont-factor-name">Relatedness of Goods & Services</div>
+            <div class="dupont-factor-desc">Are the goods or services covered by existing marks in the same or related commercial channels as yours?</div>
+          </div>
+          <div class="dupont-factor">
+            <div class="dupont-factor-name">Strength & Distinctiveness</div>
+            <div class="dupont-factor-desc">Fanciful and arbitrary marks (e.g. KODAK, APPLE for computers) score higher than descriptive or generic terms.</div>
+          </div>
+          <div class="dupont-factor">
+            <div class="dupont-factor-name">Number of Similar Marks</div>
+            <div class="dupont-factor-desc">How many live registrations exist with similar names in overlapping classes? More conflicts = lower score.</div>
+          </div>
+          <div class="dupont-factor">
+            <div class="dupont-factor-name">Channels of Trade</div>
+            <div class="dupont-factor-desc">Do the existing marks and your proposed mark reach the same customers through the same distribution channels?</div>
+          </div>
+          <div class="dupont-factor">
+            <div class="dupont-factor-name">Sophistication of Buyers</div>
+            <div class="dupont-factor-desc">Consumers of specialized or high-cost goods are less likely to be confused than general consumers of everyday products.</div>
+          </div>
+        </div>
+        <div class="score-breakdown-note">
+          This score is calculated using AI analysis of USPTO database records against the DuPont factors — the legal framework used by the USPTO and federal courts to assess likelihood of confusion between trademarks. It is an estimate only and does not guarantee any outcome at the USPTO. Scores of 75%+ suggest lower conflict risk; below 50% indicates significant conflicts that may result in rejection or opposition.
+        </div>
+      </div>
+    </div>
     <div class="stats-row">
       <div class="stat-box"><span class="stat-num">${usptoData.totalFound||0}</span><span class="stat-lbl">Records Reviewed</span></div>
       <div class="stat-box"><span class="stat-num" style="color:var(--red)">${live}</span><span class="stat-lbl">Live Conflicts</span></div>
