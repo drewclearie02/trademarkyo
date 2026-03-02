@@ -141,6 +141,28 @@
   .score-display { text-align: right; flex-shrink: 0; }
   .score-number { font-weight: 700; font-size: 5.5rem; line-height: 1; display: block; letter-spacing: -0.02em; }
   .score-label { font-weight: 700; font-size: 0.55rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-secondary); }
+  .scores-row { display: flex; gap: 2.5rem; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }
+  .score-block { text-align: right; flex-shrink: 0; }
+  .score-block-label { font-weight: 700; font-size: 0.55rem; color: var(--text-secondary); letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.3rem; display: block; }
+  .score-divider { width: 1px; background: var(--border); align-self: stretch; margin: 0.5rem 0; }
+  .oa-panel { margin-top: 1.5rem; background: var(--bg); border: 1px solid var(--border); }
+  .oa-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); gap: 1rem; flex-wrap: wrap; }
+  .oa-panel-title { font-weight: 700; font-size: 0.62rem; color: var(--text-secondary); letter-spacing: 0.2em; text-transform: uppercase; }
+  .oa-basis-tag { font-weight: 700; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.3rem 0.75rem; border: 1px solid; }
+  .oa-basis-tag.high { color: var(--red); border-color: rgba(255,71,71,0.4); background: rgba(255,71,71,0.06); }
+  .oa-basis-tag.med { color: var(--yellow); border-color: rgba(255,204,71,0.4); background: rgba(255,204,71,0.06); }
+  .oa-basis-tag.low { color: var(--green); border-color: rgba(34,180,80,0.4); background: rgba(34,180,80,0.06); }
+  .oa-explanation { padding: 1rem 1.25rem; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.65; border-bottom: 1px solid var(--border); }
+  .oa-factors { padding: 0.5rem 1.25rem 1rem; }
+  .oa-factor { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--border); }
+  .oa-factor:last-child { border-bottom: none; }
+  .oa-factor-impact { font-weight: 700; font-size: 0.55rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.2rem 0.5rem; flex-shrink: 0; margin-top: 0.15rem; }
+  .oa-factor-impact.high { background: rgba(255,71,71,0.12); color: var(--red); }
+  .oa-factor-impact.medium { background: rgba(255,204,71,0.12); color: var(--yellow); }
+  .oa-factor-impact.low { background: rgba(34,180,80,0.12); color: var(--green); }
+  .oa-factor-content { flex: 1; }
+  .oa-factor-name { font-weight: 700; font-size: 0.82rem; color: var(--text); margin-bottom: 0.2rem; }
+  .oa-factor-detail { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5; }
   .score-green { color: var(--green); } .score-yellow { color: var(--yellow); } .score-red { color: var(--red); }
   .verdict-bar { height: 3px; background: var(--border); margin-bottom: 2rem; overflow: hidden; }
   .verdict-bar-fill { height: 100%; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
@@ -317,7 +339,9 @@
     .verdict-card, .draft-card, .draft-trigger-card { padding: 1.25rem; }
     .verdict-header { flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem; }
     .verdict-mark { font-size: 2rem; word-break: break-all; }
-    .score-display { display: flex; flex-direction: row; align-items: center; gap: 1rem; }
+    .scores-row { gap: 1.25rem; justify-content: flex-start; }
+    .score-divider { width: 100%; height: 1px; margin: 0; }
+    .score-block { text-align: left; }
     .score-number { font-size: 3.5rem; }
     .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; }
     .stat-num { font-size: 1.6rem; }
@@ -574,7 +598,7 @@
 <div id="draftContainer"></div>
 
 <div class="disclaimer">
-  ⚠ NOT LEGAL ADVICE — This tool queries live USPTO data and uses AI to estimate approval likelihood and generate application drafts. All output is a starting point only. Review carefully before submitting to the USPTO. Consult a licensed trademark attorney for complex marks or contested applications. Common law rights may exist outside the USPTO database.
+  ⚠ NOT LEGAL ADVICE — This tool queries live USPTO data and uses AI to estimate approval likelihood and generate application drafts. All output is a starting point only. Review carefully before submitting to the USPTO. Consult a licensed trademark attorney for complex marks or contested applications.
 </div>
 
 </div><!-- end #appContent -->
@@ -928,6 +952,15 @@ function renderResults(mark, classCode, usptoData, analysis) {
   const score = Number(analysis.approvalScore || 0);
   const scoreClass = score >= 70 ? 'score-green' : score >= 40 ? 'score-yellow' : 'score-red';
   const barColor = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)';
+  const oaScore = Number(analysis.officeActionScore || 0);
+  const oaScoreClass = oaScore >= 70 ? 'score-red' : oaScore >= 40 ? 'score-yellow' : 'score-green';
+  const oaColor = oaScore >= 70 ? 'var(--red)' : oaScore >= 40 ? 'var(--yellow)' : 'var(--green)';
+  const oaBasisMap = { '2d': '§2(d) Confusion', '2e_descriptive': '§2(e) Descriptive', '2e_geographic': '§2(e) Geographic', '2e_surname': '§2(e) Surname', '2e_ornamental': '§2(e) Ornamental', 'none': 'Low Risk' };
+  const oaBasisLabel = oaBasisMap[analysis.officeActionBasis || 'none'] || 'Low Risk';
+  const oaTagClass = oaScore >= 70 ? 'high' : oaScore >= 40 ? 'med' : 'low';
+  const oaFactors = Array.isArray(analysis.officeActionFactors) ? analysis.officeActionFactors : [];
+  const oaFactorsHTML = oaFactors.map(f => `<div class="oa-factor"><span class="oa-factor-impact ${(f.impact||'low').toLowerCase()}">${(f.impact||'LOW').toUpperCase()}</span><div class="oa-factor-content"><div class="oa-factor-name">${f.factor||''}</div><div class="oa-factor-detail">${f.detail||''}</div></div></div>`).join('');
+  const oaPanelHTML = `<div class="oa-panel"><div class="oa-panel-header"><span class="oa-panel-title">Office Action Risk Breakdown</span><span class="oa-basis-tag ${oaTagClass}">${oaBasisLabel}</span></div>${analysis.officeActionExplanation ? `<div class="oa-explanation">${analysis.officeActionExplanation}</div>` : ''}<div class="oa-factors">${oaFactorsHTML || '<div style="padding:0.5rem 0;font-size:0.85rem;color:var(--text-secondary)">No significant office action risk factors identified.</div>'}</div></div>`;
   const conflicts = Array.isArray(analysis.conflictAnalysis) ? analysis.conflictAnalysis : [];
   const norm = conflicts.map(c => {
     const st = String(c.status || '').toUpperCase();
@@ -981,10 +1014,18 @@ function renderResults(mark, classCode, usptoData, analysis) {
         <div class="verdict-mark">${mark}</div>
         <div style="margin-top:0.5rem;font-weight:700;font-size:0.6rem;color:var(--text-secondary);letter-spacing:0.1em;text-transform:uppercase">${analysis.distinctiveness||''}${classLabel}</div>
       </div>
-      <div class="score-display">
-        <span class="score-number ${scoreClass}">${score}</span>
-        <span class="score-label">Approval Likelihood</span>
-        <div style="margin-top:0.5rem;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:${barColor}">${analysis.verdict||''}</div>
+      <div class="scores-row">
+        <div class="score-block">
+          <span class="score-block-label">Approval Likelihood</span>
+          <span class="score-number ${scoreClass}">${score}</span>
+          <div style="margin-top:0.4rem;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:${barColor}">${analysis.verdict||''}</div>
+        </div>
+        <div class="score-divider"></div>
+        <div class="score-block">
+          <span class="score-block-label">Office Action Risk</span>
+          <span class="score-number ${oaScoreClass}">${oaScore}</span>
+          <div style="margin-top:0.4rem;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:${oaColor}">${oaBasisLabel}</div>
+        </div>
       </div>
     </div>
     <div class="verdict-bar"><div class="verdict-bar-fill" id="barFill" style="width:0%;background:${barColor}"></div></div>
@@ -1029,7 +1070,8 @@ function renderResults(mark, classCode, usptoData, analysis) {
         </div>
       </div>
     </div>
-    <div class="stats-row">
+    ${oaPanelHTML}
+    <div class="stats-row" style="margin-top:1.5rem">
       <div class="stat-box"><span class="stat-num">${usptoData.totalFound||0}</span><span class="stat-lbl">Records Reviewed</span></div>
       <div class="stat-box"><span class="stat-num" style="color:var(--red)">${live}</span><span class="stat-lbl">Live Conflicts</span></div>
       <div class="stat-box"><span class="stat-num" style="color:var(--muted)">${dead}</span><span class="stat-lbl">Dead Marks</span></div>
