@@ -602,56 +602,69 @@
   /* CONFLICT ITEMS */
   /* ── CONFLICT MAP ──────────────────────────────────────────────────────────── */
   .conflict-map-wrap {
-    margin-bottom: 2rem; border: 1px solid var(--border-md); background: var(--surface2);
+    margin-bottom: 2rem; border: 1px solid var(--border-md); background: #0e0e0e;
     position: relative; overflow: hidden;
   }
   .conflict-map-wrap::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, var(--red), var(--yellow) 50%, var(--green));
+    background: linear-gradient(90deg, var(--green), var(--yellow) 50%, var(--red));
   }
   .conflict-map-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: .9rem 1.25rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: .75rem;
+    padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: .75rem;
   }
   .conflict-map-title {
-    font-weight: 700; font-size: 0.65rem; color: var(--text-secondary);
+    font-weight: 700; font-size: 0.7rem; color: var(--text);
     letter-spacing: .2em; text-transform: uppercase;
   }
   .conflict-map-legend {
-    display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap;
+    display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;
   }
   .conflict-map-legend-item {
-    display: flex; align-items: center; gap: .4rem;
-    font-weight: 700; font-size: 0.62rem; color: var(--text-tertiary); letter-spacing: .1em; text-transform: uppercase;
+    display: flex; align-items: center; gap: .5rem;
+    font-weight: 700; font-size: 0.65rem; color: var(--text-secondary); letter-spacing: .1em; text-transform: uppercase;
   }
-  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .conflict-map-body {
+    display: flex; align-items: stretch;
+  }
+  .conflict-map-y-axis {
+    display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+    padding: 1.5rem 0 1.5rem; width: 36px; flex-shrink: 0; border-right: 1px solid var(--border);
+  }
+  .conflict-map-y-label {
+    font-weight: 700; font-size: 0.58rem; color: var(--text-tertiary); letter-spacing: .12em;
+    text-transform: uppercase; writing-mode: vertical-rl; text-orientation: mixed;
+    transform: rotate(180deg); line-height: 1; white-space: nowrap;
+  }
   .conflict-map-canvas-wrap {
-    position: relative; padding: 1.5rem 1.5rem 2rem;
+    position: relative; flex: 1; padding: 1.5rem 1.5rem 0;
   }
   #conflictMapCanvas {
     display: block; width: 100%; cursor: crosshair;
   }
-  .conflict-map-axis-x {
-    display: flex; justify-content: space-between; padding: 0 1.5rem .75rem;
+  .conflict-map-x-axis {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: .6rem 1.5rem 1rem; border-top: 1px solid var(--border); margin: 0 0 0;
+  }
+  .conflict-map-x-label {
     font-weight: 700; font-size: 0.6rem; color: var(--text-tertiary); letter-spacing: .14em; text-transform: uppercase;
   }
-  .conflict-map-axis-y-label {
-    position: absolute; left: .35rem; top: 50%; transform: translateY(-50%) rotate(-90deg);
-    font-weight: 700; font-size: 0.6rem; color: var(--text-tertiary); letter-spacing: .14em;
-    text-transform: uppercase; white-space: nowrap; transform-origin: center;
+  .conflict-map-x-center {
+    font-weight: 700; font-size: 0.6rem; color: var(--text-tertiary); letter-spacing: .14em; text-transform: uppercase;
   }
   .conflict-map-tooltip {
-    position: absolute; background: var(--surface); border: 1px solid var(--border-md);
-    padding: .75rem 1rem; pointer-events: none; z-index: 100;
-    max-width: 220px; box-shadow: 0 8px 32px rgba(0,0,0,.6);
-    opacity: 0; transition: opacity .15s;
+    position: absolute; background: #111; border: 1px solid var(--border-md);
+    padding: 1rem 1.1rem; pointer-events: none; z-index: 100;
+    width: 230px; box-shadow: 0 12px 40px rgba(0,0,0,.8);
+    opacity: 0; transition: opacity .12s;
   }
   .conflict-map-tooltip.visible { opacity: 1; }
-  .cmt-mark { font-weight: 700; font-size: .9rem; text-transform: uppercase; margin-bottom: .35rem; letter-spacing: .04em; }
-  .cmt-row { font-size: .75rem; color: var(--text-secondary); margin-bottom: .2rem; display: flex; gap: .5rem; }
-  .cmt-label { color: var(--text-tertiary); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .65rem; flex-shrink: 0; }
+  .cmt-mark { font-weight: 700; font-size: .95rem; text-transform: uppercase; margin-bottom: .5rem; letter-spacing: .06em; line-height: 1.2; }
+  .cmt-row { font-size: .8rem; color: var(--text-secondary); margin-bottom: .25rem; display: flex; gap: .5rem; align-items: flex-start; }
+  .cmt-label { color: var(--text-tertiary); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .62rem; flex-shrink: 0; padding-top: .05rem; min-width: 46px; }
   .conflict-map-no-data {
-    padding: 2.5rem; text-align: center; font-weight: 700; font-size: .75rem;
+    padding: 3rem; text-align: center; font-weight: 700; font-size: .75rem;
     color: var(--text-tertiary); letter-spacing: .18em; text-transform: uppercase;
   }
   .click-hint {
@@ -1490,18 +1503,26 @@ function renderResults(mark, classCode, usptoData, analysis) {
         <span class="conflict-map-legend-item"><span class="legend-dot" style="background:var(--red)"></span>High Risk</span>
         <span class="conflict-map-legend-item"><span class="legend-dot" style="background:var(--yellow)"></span>Medium Risk</span>
         <span class="conflict-map-legend-item"><span class="legend-dot" style="background:var(--green)"></span>Low Risk</span>
-        <span class="conflict-map-legend-item"><span class="legend-dot" style="background:transparent;border:1.5px solid #555"></span>Dead Mark</span>
+        <span class="conflict-map-legend-item"><span class="legend-dot" style="background:transparent;border:1.5px solid #555"></span>Dead</span>
       </div>
     </div>
-    <div class="conflict-map-canvas-wrap">
-      <span class="conflict-map-axis-y-label">← LOWER OVERLAP &nbsp;&nbsp; GOODS OVERLAP &nbsp;&nbsp; HIGHER OVERLAP →</span>
-      <canvas id="conflictMapCanvas" height="320"></canvas>
-      <div class="conflict-map-tooltip" id="conflictMapTooltip"></div>
-    </div>
-    <div class="conflict-map-axis-x">
-      <span>← Less Similar</span>
-      <span>Mark Similarity</span>
-      <span>More Similar →</span>
+    <div class="conflict-map-body">
+      <div class="conflict-map-y-axis">
+        <span class="conflict-map-y-label">Higher Overlap ↑</span>
+        <span class="conflict-map-y-label" style="opacity:.4">Goods &amp; Services</span>
+        <span class="conflict-map-y-label">↓ Lower Overlap</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;">
+        <div class="conflict-map-canvas-wrap">
+          <canvas id="conflictMapCanvas"></canvas>
+          <div class="conflict-map-tooltip" id="conflictMapTooltip"></div>
+        </div>
+        <div class="conflict-map-x-axis">
+          <span class="conflict-map-x-label">← Less Similar</span>
+          <span class="conflict-map-x-center">Mark Similarity</span>
+          <span class="conflict-map-x-label">More Similar →</span>
+        </div>
+      </div>
     </div>
   </div>`;
 
@@ -1634,130 +1655,203 @@ function renderConflictMap(mapPoints) {
   const canvas = document.getElementById('conflictMapCanvas');
   if (!canvas || !mapPoints.length) return;
   const tooltip = document.getElementById('conflictMapTooltip');
+  const DPR = window.devicePixelRatio || 1;
 
-  // Set canvas pixel size
-  const W = canvas.offsetWidth || 700;
-  const H = 320;
-  canvas.width = W * window.devicePixelRatio;
-  canvas.height = H * window.devicePixelRatio;
+  const W = canvas.parentElement.clientWidth - 48; // subtract canvas-wrap padding
+  const H = Math.max(340, Math.min(420, window.innerHeight * 0.42));
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + 'px';
   canvas.style.height = H + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-  const PAD = { top: 20, right: 24, bottom: 20, left: 40 };
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+
+  const PAD = { top: 24, right: 28, bottom: 24, left: 16 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
-  // Danger zone background — top right quadrant is hot
-  const grad = ctx.createLinearGradient(PAD.left, PAD.top, PAD.left + plotW, PAD.top + plotH);
-  grad.addColorStop(0, 'rgba(61,219,122,0.04)');
-  grad.addColorStop(1, 'rgba(255,64,64,0.08)');
-  ctx.fillStyle = grad;
+  // ── Background gradient (safe → danger)
+  const bgGrad = ctx.createLinearGradient(PAD.left, PAD.top + plotH, PAD.left + plotW, PAD.top);
+  bgGrad.addColorStop(0,   'rgba(61,219,122,0.05)');
+  bgGrad.addColorStop(0.5, 'rgba(255,184,0,0.03)');
+  bgGrad.addColorStop(1,   'rgba(255,64,64,0.10)');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(PAD.left, PAD.top, plotW, plotH);
 
-  // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  // ── Danger zone quadrant highlight
+  const dzX = PAD.left + plotW * 0.6;
+  const dzY = PAD.top;
+  const dzW = plotW * 0.4;
+  const dzH = plotH * 0.5;
+  const dzGrad = ctx.createLinearGradient(dzX, dzY + dzH, dzX + dzW, dzY);
+  dzGrad.addColorStop(0, 'rgba(255,64,64,0.0)');
+  dzGrad.addColorStop(1, 'rgba(255,64,64,0.12)');
+  ctx.fillStyle = dzGrad;
+  ctx.fillRect(dzX, dzY, dzW, dzH);
+
+  // ── Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.055)';
   ctx.lineWidth = 1;
   for (let i = 1; i < 4; i++) {
-    const x = PAD.left + (plotW / 4) * i;
-    const y = PAD.top + (plotH / 4) * i;
-    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + plotH); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + plotW, y); ctx.stroke();
+    const gx = PAD.left + (plotW / 4) * i;
+    const gy = PAD.top + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(gx, PAD.top); ctx.lineTo(gx, PAD.top + plotH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD.left, gy); ctx.lineTo(PAD.left + plotW, gy); ctx.stroke();
   }
 
-  // Danger zone label
-  ctx.font = '700 9px Helvetica, Arial, sans-serif';
-  ctx.letterSpacing = '1px';
-  ctx.fillStyle = 'rgba(255,64,64,0.25)';
+  // ── Zone labels
+  ctx.font = 'bold 10px Helvetica, Arial, sans-serif';
+  ctx.fillStyle = 'rgba(255,64,64,0.3)';
   ctx.textAlign = 'right';
-  ctx.fillText('DANGER ZONE', PAD.left + plotW - 6, PAD.top + 14);
+  ctx.fillText('DANGER ZONE', PAD.left + plotW - 10, PAD.top + 18);
 
-  // Safe zone label
-  ctx.fillStyle = 'rgba(61,219,122,0.2)';
+  ctx.fillStyle = 'rgba(61,219,122,0.25)';
   ctx.textAlign = 'left';
-  ctx.fillText('SAFE ZONE', PAD.left + 6, PAD.top + plotH - 8);
+  ctx.fillText('SAFE ZONE', PAD.left + 10, PAD.top + plotH - 10);
 
-  // Axes
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  // ── Plot area border
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + plotH);
-  ctx.lineTo(PAD.left + plotW, PAD.top + plotH);
-  ctx.stroke();
+  ctx.strokeRect(PAD.left, PAD.top, plotW, plotH);
 
-  // Plot points with jitter to prevent exact overlap
-  const jitter = () => (Math.random() - 0.5) * 12;
-  const dots = mapPoints.map(p => {
-    const x = PAD.left + (p.sim / 100) * plotW + jitter();
-    const y = PAD.top + plotH - (p.overlap / 100) * plotH + jitter();
-    const color = p.riskLevel === 'HIGH' ? '#FF4040' : p.riskLevel === 'MEDIUM' ? '#FFB800' : '#3DDB7A';
-    const cx = Math.max(PAD.left + 8, Math.min(PAD.left + plotW - 8, x));
-    const cy = Math.max(PAD.top + 8, Math.min(PAD.top + plotH - 8, y));
+  // ── Compute dot positions with jitter, avoid tight clustering
+  const DOT_R_LIVE = 9;
+  const DOT_R_DEAD = 6;
+  const usedPositions = [];
 
-    // Outer glow ring
-    if (p.isLive) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, 11, 0, Math.PI * 2);
-      ctx.fillStyle = color.replace(')', ',0.15)').replace('rgb', 'rgba').replace('#FF4040','rgba(255,64,64,0.15)').replace('#FFB800','rgba(255,184,0,0.15)').replace('#3DDB7A','rgba(61,219,122,0.15)');
-      ctx.fill();
+  function findPosition(idealX, idealY, r) {
+    let cx = idealX, cy = idealY;
+    cx = Math.max(PAD.left + r + 2, Math.min(PAD.left + plotW - r - 2, cx));
+    cy = Math.max(PAD.top + r + 2, Math.min(PAD.top + plotH - r - 2, cy));
+    // If too close to existing dot, nudge
+    for (let attempt = 0; attempt < 12; attempt++) {
+      let tooClose = usedPositions.some(p => Math.hypot(p.x - cx, p.y - cy) < (r + p.r + 8));
+      if (!tooClose) break;
+      cx += (Math.random() - 0.5) * 32;
+      cy += (Math.random() - 0.5) * 32;
+      cx = Math.max(PAD.left + r + 2, Math.min(PAD.left + plotW - r - 2, cx));
+      cy = Math.max(PAD.top + r + 2, Math.min(PAD.top + plotH - r - 2, cy));
     }
+    return { cx, cy };
+  }
 
-    // Main dot
-    ctx.beginPath();
-    ctx.arc(cx, cy, p.isLive ? 7 : 5, 0, Math.PI * 2);
-    if (p.isLive) {
-      ctx.fillStyle = color;
-    } else {
-      ctx.fillStyle = 'transparent';
-      ctx.strokeStyle = '#555555';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-    if (p.isLive) ctx.fill();
-
-    // Mark label for high risk or first few
-    if (p.riskLevel === 'HIGH' || mapPoints.indexOf(p) < 3) {
-      ctx.font = '700 9px Helvetica, Arial, sans-serif';
-      ctx.letterSpacing = '0.5px';
-      ctx.fillStyle = p.isLive ? color : '#666666';
-      ctx.textAlign = cx > PAD.left + plotW * 0.75 ? 'right' : 'left';
-      const labelX = ctx.textAlign === 'right' ? cx - 10 : cx + 10;
-      ctx.fillText((p.mark || '').substring(0, 14), labelX, cy - 10);
-    }
-
-    return { cx, cy, p };
+  // ── First pass: compute all positions
+  const dots = mapPoints.map((p, idx) => {
+    const r = p.isLive ? DOT_R_LIVE : DOT_R_DEAD;
+    const idealX = PAD.left + (p.sim / 100) * plotW;
+    const idealY = PAD.top + plotH - (p.overlap / 100) * plotH;
+    const { cx, cy } = findPosition(idealX, idealY, r);
+    usedPositions.push({ x: cx, y: cy, r });
+    return { cx, cy, r, p, idx };
   });
 
-  // Interactivity
-  let activeIdx = -1;
+  // ── Second pass: draw glows then dots (so glows don't obscure other dots)
+  dots.forEach(({ cx, cy, r, p }) => {
+    const color = p.riskLevel === 'HIGH' ? '#FF4040' : p.riskLevel === 'MEDIUM' ? '#FFB800' : '#3DDB7A';
+    if (p.isLive) {
+      // Outer glow
+      const grd = ctx.createRadialGradient(cx, cy, r, cx, cy, r * 2.8);
+      const alpha = p.riskLevel === 'HIGH' ? '0.22' : '0.14';
+      grd.addColorStop(0, color.replace('#', 'rgba(').replace('FF4040', '255,64,64,'+alpha).replace('FFB800','255,184,0,'+alpha).replace('3DDB7A','61,219,122,'+alpha)+')');
+      // simpler approach
+      const glowColors = { 'HIGH': `rgba(255,64,64,${alpha})`, 'MEDIUM': `rgba(255,184,0,${alpha})`, 'LOW': `rgba(61,219,122,${alpha})` };
+      const grd2 = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 3);
+      grd2.addColorStop(0, glowColors[p.riskLevel] || glowColors.LOW);
+      grd2.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 3, 0, Math.PI * 2);
+      ctx.fillStyle = grd2;
+      ctx.fill();
+    }
+  });
+
+  // Draw dots
+  dots.forEach(({ cx, cy, r, p }) => {
+    const color = p.riskLevel === 'HIGH' ? '#FF4040' : p.riskLevel === 'MEDIUM' ? '#FFB800' : '#3DDB7A';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    if (p.isLive) {
+      ctx.fillStyle = color;
+      ctx.fill();
+      // Inner highlight
+      ctx.beginPath();
+      ctx.arc(cx - r * 0.25, cy - r * 0.3, r * 0.35, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#606060';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Dead mark center dot
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#606060';
+      ctx.fill();
+    }
+  });
+
+  // ── Draw labels last so they're on top — smart positioning
+  dots.forEach(({ cx, cy, r, p }) => {
+    const color = p.isLive
+      ? (p.riskLevel === 'HIGH' ? '#FF4040' : p.riskLevel === 'MEDIUM' ? '#FFB800' : '#3DDB7A')
+      : '#707070';
+    const label = (p.mark || '').toUpperCase().substring(0, 16);
+    ctx.font = 'bold 10.5px Helvetica, Arial, sans-serif';
+    const textW = ctx.measureText(label).width;
+
+    // Smart label offset — push away from plot edges and other labels
+    let lx, ly;
+    const margin = r + 8;
+    // Default: label above-right
+    lx = cx + margin;
+    ly = cy - margin;
+    // Near right edge: go left
+    if (cx + margin + textW > PAD.left + plotW - 4) lx = cx - margin - textW;
+    // Near top edge: go below
+    if (cy - margin - 12 < PAD.top + 4) ly = cy + margin + 11;
+    // Near bottom edge: go above
+    if (cy + margin + 12 > PAD.top + plotH - 4) ly = cy - margin;
+
+    // Draw subtle shadow for readability
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillText(label, lx + 1, ly + 1);
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.fillText(label, lx, ly);
+  });
+
+  // ── Interactivity
+  let hovered = -1;
+
+  function getHovered(mx, my) {
+    for (let i = dots.length - 1; i >= 0; i--) {
+      if (Math.hypot(dots[i].cx - mx, dots[i].cy - my) < dots[i].r + 6) return i;
+    }
+    return -1;
+  }
 
   canvas.onmousemove = (e) => {
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    let found = -1;
-    dots.forEach((d, i) => {
-      const dist = Math.hypot(d.cx - mx, d.cy - my);
-      if (dist < 14) found = i;
-    });
-    if (found !== activeIdx) {
-      activeIdx = found;
+    const mx = (e.clientX - rect.left);
+    const my = (e.clientY - rect.top);
+    const found = getHovered(mx, my);
+    if (found !== hovered) {
+      hovered = found;
       if (found >= 0) {
-        const d = dots[found];
-        const p = d.p;
+        const p = dots[found].p;
         const riskColor = p.riskLevel === 'HIGH' ? '#FF4040' : p.riskLevel === 'MEDIUM' ? '#FFB800' : '#3DDB7A';
         tooltip.innerHTML = `
           <div class="cmt-mark" style="color:${riskColor}">${p.mark || 'Unknown'}</div>
-          <div class="cmt-row"><span class="cmt-label">Status</span>${p.isLive ? '<span style="color:#3DDB7A">● Live</span>' : '<span style="color:#555">○ Dead</span>'}</div>
+          <div class="cmt-row"><span class="cmt-label">Status</span><span style="color:${p.isLive ? '#3DDB7A' : '#666'}">${p.isLive ? '● Live' : '○ Dead'}</span></div>
           <div class="cmt-row"><span class="cmt-label">Risk</span><span style="color:${riskColor}">${p.riskLevel}</span></div>
-          <div class="cmt-row" style="margin-top:.3rem">${(p.goods || 'No description').substring(0,90)}${(p.goods||'').length > 90 ? '...' : ''}</div>
+          ${p.goods ? `<div class="cmt-row" style="margin-top:.4rem"><span class="cmt-label">Goods</span><span>${p.goods.substring(0,80)}${p.goods.length>80?'...':''}</span></div>` : ''}
         `;
-        // Position tooltip — avoid overflow
-        const tipW = 220; const tipH = 110;
-        let tx = e.clientX - rect.left + 14;
-        let ty = e.clientY - rect.top - tipH / 2;
-        if (tx + tipW > W) tx = e.clientX - rect.left - tipW - 14;
-        if (ty < 0) ty = 4;
+        const tipW = 230; const tipH = tooltip.offsetHeight || 120;
+        let tx = mx + 16;
+        let ty = my - tipH / 2;
+        if (tx + tipW > W) tx = mx - tipW - 16;
+        if (ty < 4) ty = 4;
         if (ty + tipH > H) ty = H - tipH - 4;
         tooltip.style.left = tx + 'px';
         tooltip.style.top = ty + 'px';
@@ -1770,14 +1864,8 @@ function renderConflictMap(mapPoints) {
     }
   };
 
-  canvas.onclick = (e) => {
-    if (activeIdx >= 0) openModal(dots[activeIdx].p.i);
-  };
-
-  canvas.onmouseleave = () => {
-    tooltip.classList.remove('visible');
-    activeIdx = -1;
-  };
+  canvas.onclick = () => { if (hovered >= 0) openModal(dots[hovered].p.i); };
+  canvas.onmouseleave = () => { tooltip.classList.remove('visible'); hovered = -1; };
 }
 
 /* ── SUGGESTIONS ── */
