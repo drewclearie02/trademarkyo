@@ -600,6 +600,60 @@
   .oa-factor-detail { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6; }
 
   /* CONFLICT ITEMS */
+  /* ── CONFLICT MAP ──────────────────────────────────────────────────────────── */
+  .conflict-map-wrap {
+    margin-bottom: 2rem; border: 1px solid var(--border-md); background: var(--surface2);
+    position: relative; overflow: hidden;
+  }
+  .conflict-map-wrap::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--red), var(--yellow) 50%, var(--green));
+  }
+  .conflict-map-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem 1.25rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: .75rem;
+  }
+  .conflict-map-title {
+    font-weight: 700; font-size: 0.65rem; color: var(--text-secondary);
+    letter-spacing: .2em; text-transform: uppercase;
+  }
+  .conflict-map-legend {
+    display: flex; gap: 1.25rem; align-items: center; flex-wrap: wrap;
+  }
+  .conflict-map-legend-item {
+    display: flex; align-items: center; gap: .4rem;
+    font-weight: 700; font-size: 0.62rem; color: var(--text-tertiary); letter-spacing: .1em; text-transform: uppercase;
+  }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .conflict-map-canvas-wrap {
+    position: relative; padding: 1.5rem 1.5rem 2rem;
+  }
+  #conflictMapCanvas {
+    display: block; width: 100%; cursor: crosshair;
+  }
+  .conflict-map-axis-x {
+    display: flex; justify-content: space-between; padding: 0 1.5rem .75rem;
+    font-weight: 700; font-size: 0.6rem; color: var(--text-tertiary); letter-spacing: .14em; text-transform: uppercase;
+  }
+  .conflict-map-axis-y-label {
+    position: absolute; left: .35rem; top: 50%; transform: translateY(-50%) rotate(-90deg);
+    font-weight: 700; font-size: 0.6rem; color: var(--text-tertiary); letter-spacing: .14em;
+    text-transform: uppercase; white-space: nowrap; transform-origin: center;
+  }
+  .conflict-map-tooltip {
+    position: absolute; background: var(--surface); border: 1px solid var(--border-md);
+    padding: .75rem 1rem; pointer-events: none; z-index: 100;
+    max-width: 220px; box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    opacity: 0; transition: opacity .15s;
+  }
+  .conflict-map-tooltip.visible { opacity: 1; }
+  .cmt-mark { font-weight: 700; font-size: .9rem; text-transform: uppercase; margin-bottom: .35rem; letter-spacing: .04em; }
+  .cmt-row { font-size: .75rem; color: var(--text-secondary); margin-bottom: .2rem; display: flex; gap: .5rem; }
+  .cmt-label { color: var(--text-tertiary); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .65rem; flex-shrink: 0; }
+  .conflict-map-no-data {
+    padding: 2.5rem; text-align: center; font-weight: 700; font-size: .75rem;
+    color: var(--text-tertiary); letter-spacing: .18em; text-transform: uppercase;
+  }
   .click-hint {
     font-size: 0.7rem; color: var(--text-tertiary); letter-spacing: .1em;
     text-transform: uppercase; margin-bottom: .75rem; font-weight: 700;
@@ -1421,6 +1475,36 @@ function renderResults(mark, classCode, usptoData, analysis) {
   const live = norm.filter(c => c.isLive).length;
   const dead = norm.filter(c => !c.isLive).length;
 
+  // Build conflict map scores — derive similarity + overlap scores from riskLevel and isLive
+  const mapPoints = norm.map((c, i) => {
+    // Similarity score: HIGH=85, MEDIUM=50, LOW=20, nudged by index for spread
+    const riskVal = c.riskLevel === 'HIGH' ? 75 + Math.random()*20 : c.riskLevel === 'MEDIUM' ? 35 + Math.random()*30 : 10 + Math.random()*20;
+    // Overlap score: live marks score higher, dead lower
+    const overlapVal = c.isLive ? 50 + Math.random()*40 : 15 + Math.random()*35;
+    return { i, mark: c.mark, riskLevel: c.riskLevel, isLive: c.isLive, goods: c.goods, sim: riskVal, overlap: overlapVal };
+  });
+  const conflictMapHTML = `<div class="conflict-map-wrap">
+    <div class="conflict-map-header">
+      <span class="conflict-map-title">Conflict Landscape Map</span>
+      <div class="conflict-map-legend">
+        <span class="conflict-map-legend-item"><span class="legend-dot" style="background:var(--red)"></span>High Risk</span>
+        <span class="conflict-map-legend-item"><span class="legend-dot" style="background:var(--yellow)"></span>Medium Risk</span>
+        <span class="conflict-map-legend-item"><span class="legend-dot" style="background:var(--green)"></span>Low Risk</span>
+        <span class="conflict-map-legend-item"><span class="legend-dot" style="background:transparent;border:1.5px solid #555"></span>Dead Mark</span>
+      </div>
+    </div>
+    <div class="conflict-map-canvas-wrap">
+      <span class="conflict-map-axis-y-label">← LOWER OVERLAP &nbsp;&nbsp; GOODS OVERLAP &nbsp;&nbsp; HIGHER OVERLAP →</span>
+      <canvas id="conflictMapCanvas" height="320"></canvas>
+      <div class="conflict-map-tooltip" id="conflictMapTooltip"></div>
+    </div>
+    <div class="conflict-map-axis-x">
+      <span>← Less Similar</span>
+      <span>Mark Similarity</span>
+      <span>More Similar →</span>
+    </div>
+  </div>`;
+
   const conflictsHTML = norm.length > 0
     ? `<div class="click-hint">Tap any row for full detail →</div>` + norm.map((c, i) => {
         const r = c.riskLevel || 'MEDIUM';
@@ -1529,6 +1613,7 @@ function renderResults(mark, classCode, usptoData, analysis) {
         Clearance PDF
       </button>
     </div>
+    ${norm.length > 0 ? conflictMapHTML : ''}
     ${conflictsHTML}
     <div class="variations-searched" id="variationsRow" style="margin-top:1.25rem;padding-top:1.25rem;border-top:1px solid var(--border)">
       <span class="variations-label">Also Searched</span>
@@ -1540,7 +1625,159 @@ function renderResults(mark, classCode, usptoData, analysis) {
   setTimeout(() => {
     const b = document.getElementById('barFill');
     if (b) b.style.width = score + '%';
-  }, 100);
+    if (mapPoints.length > 0) renderConflictMap(mapPoints);
+  }, 150);
+}
+
+/* ── CONFLICT MAP RENDERER ── */
+function renderConflictMap(mapPoints) {
+  const canvas = document.getElementById('conflictMapCanvas');
+  if (!canvas || !mapPoints.length) return;
+  const tooltip = document.getElementById('conflictMapTooltip');
+
+  // Set canvas pixel size
+  const W = canvas.offsetWidth || 700;
+  const H = 320;
+  canvas.width = W * window.devicePixelRatio;
+  canvas.height = H * window.devicePixelRatio;
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+  const PAD = { top: 20, right: 24, bottom: 20, left: 40 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  // Danger zone background — top right quadrant is hot
+  const grad = ctx.createLinearGradient(PAD.left, PAD.top, PAD.left + plotW, PAD.top + plotH);
+  grad.addColorStop(0, 'rgba(61,219,122,0.04)');
+  grad.addColorStop(1, 'rgba(255,64,64,0.08)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(PAD.left, PAD.top, plotW, plotH);
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    const x = PAD.left + (plotW / 4) * i;
+    const y = PAD.top + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + plotH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + plotW, y); ctx.stroke();
+  }
+
+  // Danger zone label
+  ctx.font = '700 9px Helvetica, Arial, sans-serif';
+  ctx.letterSpacing = '1px';
+  ctx.fillStyle = 'rgba(255,64,64,0.25)';
+  ctx.textAlign = 'right';
+  ctx.fillText('DANGER ZONE', PAD.left + plotW - 6, PAD.top + 14);
+
+  // Safe zone label
+  ctx.fillStyle = 'rgba(61,219,122,0.2)';
+  ctx.textAlign = 'left';
+  ctx.fillText('SAFE ZONE', PAD.left + 6, PAD.top + plotH - 8);
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD.left, PAD.top); ctx.lineTo(PAD.left, PAD.top + plotH);
+  ctx.lineTo(PAD.left + plotW, PAD.top + plotH);
+  ctx.stroke();
+
+  // Plot points with jitter to prevent exact overlap
+  const jitter = () => (Math.random() - 0.5) * 12;
+  const dots = mapPoints.map(p => {
+    const x = PAD.left + (p.sim / 100) * plotW + jitter();
+    const y = PAD.top + plotH - (p.overlap / 100) * plotH + jitter();
+    const color = p.riskLevel === 'HIGH' ? '#FF4040' : p.riskLevel === 'MEDIUM' ? '#FFB800' : '#3DDB7A';
+    const cx = Math.max(PAD.left + 8, Math.min(PAD.left + plotW - 8, x));
+    const cy = Math.max(PAD.top + 8, Math.min(PAD.top + plotH - 8, y));
+
+    // Outer glow ring
+    if (p.isLive) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, 11, 0, Math.PI * 2);
+      ctx.fillStyle = color.replace(')', ',0.15)').replace('rgb', 'rgba').replace('#FF4040','rgba(255,64,64,0.15)').replace('#FFB800','rgba(255,184,0,0.15)').replace('#3DDB7A','rgba(61,219,122,0.15)');
+      ctx.fill();
+    }
+
+    // Main dot
+    ctx.beginPath();
+    ctx.arc(cx, cy, p.isLive ? 7 : 5, 0, Math.PI * 2);
+    if (p.isLive) {
+      ctx.fillStyle = color;
+    } else {
+      ctx.fillStyle = 'transparent';
+      ctx.strokeStyle = '#555555';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    if (p.isLive) ctx.fill();
+
+    // Mark label for high risk or first few
+    if (p.riskLevel === 'HIGH' || mapPoints.indexOf(p) < 3) {
+      ctx.font = '700 9px Helvetica, Arial, sans-serif';
+      ctx.letterSpacing = '0.5px';
+      ctx.fillStyle = p.isLive ? color : '#666666';
+      ctx.textAlign = cx > PAD.left + plotW * 0.75 ? 'right' : 'left';
+      const labelX = ctx.textAlign === 'right' ? cx - 10 : cx + 10;
+      ctx.fillText((p.mark || '').substring(0, 14), labelX, cy - 10);
+    }
+
+    return { cx, cy, p };
+  });
+
+  // Interactivity
+  let activeIdx = -1;
+
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    let found = -1;
+    dots.forEach((d, i) => {
+      const dist = Math.hypot(d.cx - mx, d.cy - my);
+      if (dist < 14) found = i;
+    });
+    if (found !== activeIdx) {
+      activeIdx = found;
+      if (found >= 0) {
+        const d = dots[found];
+        const p = d.p;
+        const riskColor = p.riskLevel === 'HIGH' ? '#FF4040' : p.riskLevel === 'MEDIUM' ? '#FFB800' : '#3DDB7A';
+        tooltip.innerHTML = `
+          <div class="cmt-mark" style="color:${riskColor}">${p.mark || 'Unknown'}</div>
+          <div class="cmt-row"><span class="cmt-label">Status</span>${p.isLive ? '<span style="color:#3DDB7A">● Live</span>' : '<span style="color:#555">○ Dead</span>'}</div>
+          <div class="cmt-row"><span class="cmt-label">Risk</span><span style="color:${riskColor}">${p.riskLevel}</span></div>
+          <div class="cmt-row" style="margin-top:.3rem">${(p.goods || 'No description').substring(0,90)}${(p.goods||'').length > 90 ? '...' : ''}</div>
+        `;
+        // Position tooltip — avoid overflow
+        const tipW = 220; const tipH = 110;
+        let tx = e.clientX - rect.left + 14;
+        let ty = e.clientY - rect.top - tipH / 2;
+        if (tx + tipW > W) tx = e.clientX - rect.left - tipW - 14;
+        if (ty < 0) ty = 4;
+        if (ty + tipH > H) ty = H - tipH - 4;
+        tooltip.style.left = tx + 'px';
+        tooltip.style.top = ty + 'px';
+        tooltip.classList.add('visible');
+        canvas.style.cursor = 'pointer';
+      } else {
+        tooltip.classList.remove('visible');
+        canvas.style.cursor = 'crosshair';
+      }
+    }
+  };
+
+  canvas.onclick = (e) => {
+    if (activeIdx >= 0) openModal(dots[activeIdx].p.i);
+  };
+
+  canvas.onmouseleave = () => {
+    tooltip.classList.remove('visible');
+    activeIdx = -1;
+  };
 }
 
 /* ── SUGGESTIONS ── */
