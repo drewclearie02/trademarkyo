@@ -2155,7 +2155,6 @@ document.getElementById('markInput').addEventListener('keypress', e => { if (e.k
 
 /* ── CLIENT OPINION LETTER ── */
 let _opinionLetterText = '';
-let _opinionLetterHTML = '';
 
 function openOpinionModal() {
   if (!_lastScanData && !_currentMark) return;
@@ -2189,6 +2188,7 @@ async function generateOpinionLetter() {
   const btn = document.getElementById('opinionGenerateBtn');
   btn.disabled = true; btn.textContent = 'GENERATING...';
 
+  document.getElementById('opinionForm').style.display = 'none';
   document.getElementById('opinionBody').style.display = 'block';
   document.getElementById('opinionBody').innerHTML = `<div class="opinion-loading">
     <div class="opinion-loading-spinner"></div>
@@ -2200,99 +2200,85 @@ async function generateOpinionLetter() {
     const analysis = _currentAnalysis || (_lastScanData && _lastScanData.analysis);
     const mark = _currentMark || (_lastScanData && _lastScanData.mark) || '';
     const classCode = _currentClass || (_lastScanData && _lastScanData.classCode) || '';
-    const usptoData = _lastScanData ? _lastScanData.usptoData : { totalFound: 0, liveSearch: false };
+    const classLabel = classCode ? `International Class ${classCode}` : 'all classes';
+    const conflicts = (analysis.conflictAnalysis || []);
+    const liveConflicts = conflicts.filter(c => String(c.status||'').toUpperCase().includes('LIVE'));
+    const oaBasisMap = {'2d':'§2(d) likelihood of confusion','2e_descriptive':'§2(e)(1) mere descriptiveness','2e_geographic':'§2(e)(2) primarily geographically descriptive','2e_surname':'§2(e)(4) primarily merely a surname','2e_ornamental':'§2(e) ornamental','none':'no significant refusal basis'};
+    const oaBasis = oaBasisMap[analysis.officeActionBasis || 'none'];
 
-    const resp = await fetch('/api/opinion', {
+    const resp = await fetch('/api/letter', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        markName: mark,
+        mark,
         classCode,
+        classLabel,
+        firm: firmName,
         attyName,
-        firmName,
-        clientName,
+        client: clientName,
         matterNo,
-        analysis,
-        usptoData
+        date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+        approvalScore: Number(analysis.approvalScore || 0),
+        verdict: (analysis.verdict || '').toUpperCase(),
+        oaScore: Number(analysis.officeActionScore || 0),
+        oaBasis,
+        distinctiveness: analysis.distinctiveness || '',
+        recommendation: analysis.recommendation || '',
+        mainRisks: analysis.mainRisks || [],
+        conflictCount: conflicts.length,
+        liveConflictCount: liveConflicts.length,
+        highRiskCount: conflicts.filter(c => (c.riskLevel||'').toLowerCase() === 'high').length,
+        conflictSummary: liveConflicts.slice(0, 5).map(c =>
+          `${c.markName || 'Unknown'} (Serial No. ${c.serialNumber || 'N/A'}, ${c.status || 'Live'}) — ${c.similarity || ''}`
+        ).join('\n'),
+        totalFound: _lastScanData ? (_lastScanData.usptoData.totalFound || 0) : 0
       })
     });
 
-    if (!resp.ok) throw new Error(`Opinion API failed (${resp.status})`);
+    if (!resp.ok) throw new Error(`Server error (${resp.status})`);
     const data = await resp.json();
+    _opinionLetterText = data.letter || '';
 
-    renderOpinionLetter(data, attyName, firmName, clientName, matterNo, mark, classCode);
+    renderOpinionLetter(_opinionLetterText, attyName, firmName, clientName, matterNo, mark, classCode);
     document.getElementById('opinionActions').style.display = 'flex';
     document.getElementById('opinionModalSub').textContent = `Draft complete — ${mark} · ${new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`;
 
   } catch (e) {
     document.getElementById('opinionBody').innerHTML = `<div style="padding:1.5rem"><div class="error-box">Could not generate letter: ${e.message}</div></div>`;
+    document.getElementById('opinionForm').style.display = 'block';
   }
 
   btn.disabled = false; btn.textContent = 'GENERATE OPINION LETTER →';
 }
 
-function renderOpinionLetter(data, attyName, firmName, clientName, matterNo, mark, classCode) {
+function renderOpinionLetter(letterText, attyName, firmName, clientName, matterNo, mark, classCode) {
   const today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
   const classLabel = classCode ? `International Class ${classCode}` : 'All Classes';
-  const score = data.approvalScore || ((_currentAnalysis||{}).approvalScore) || 0;
-  const verdict = data.verdict || ((_currentAnalysis||{}).verdict) || '';
 
-  const letterHTML = `
-<div class="opinion-letter-wrap" id="opinionLetterContent">
+  // Convert plain text to styled HTML letter
+  const paragraphs = letterText.split('\n\n').filter(p => p.trim());
+  const bodyHTML = paragraphs.map(p => {
+    const t = p.trim();
+    // Section headers: ALL CAPS, short, no period
+    if (t === t.toUpperCase() && t.length < 80 && !t.includes('.') && t.length > 3) {
+      return `<h2>${t}</h2>`;
+    }
+    return `<p>${t.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+
+  const letterHTML = `<div class="opinion-letter-wrap" id="opinionLetterContent">
   <div class="letter-header">
-    <div style="font-weight:700;font-size:1.1rem">${firmName}</div>
-    <div style="color:#444;margin-top:.25rem">${attyName}</div>
-    <div style="color:#666;font-size:.875rem;margin-top:.5rem">${today}</div>
+    <div style="font-weight:700;font-size:1.15rem">${firmName}</div>
+    <div style="color:#555;margin-top:.2rem">${attyName}</div>
+    <div style="color:#777;font-size:.875rem;margin-top:.4rem">${today}</div>
   </div>
-
-  <div style="margin-bottom:1.5rem">
-    <div style="font-weight:700">${clientName}</div>
-  </div>
-
-  <div class="letter-re">
-    Re: Trademark Clearance Opinion — "${mark.toUpperCase()}"${classCode ? ` (${classLabel})` : ''}${matterNo ? ` | Matter No. ${matterNo}` : ''}
-  </div>
-
-  <p>Dear ${clientName},</p>
-
-  <p>${data.introduction || `I write to provide my trademark clearance opinion regarding your proposed mark "${mark.toUpperCase()}" in connection with ${classLabel}. I have reviewed the records of the United States Patent and Trademark Office (USPTO) and conducted an analysis under the factors set forth in <em>In re E.I. DuPont DeNemours &amp; Co.</em>, 476 F.2d 1357 (C.C.P.A. 1973), which govern likelihood-of-confusion determinations.`}</p>
-
-  <h2>I. Search Summary</h2>
-  <p>${data.searchSummary || `A search of the USPTO's trademark database was conducted for marks similar to "${mark.toUpperCase()}" in ${classLabel}. The search revealed ${(_lastScanData&&_lastScanData.usptoData&&_lastScanData.usptoData.totalFound)||0} potentially relevant records, of which the following were identified as requiring further analysis.`}</p>
-
-  <h2>II. DuPont Factor Analysis</h2>
-  <p>${data.dupontAnalysis || `Based on the factors enumerated in <em>DuPont</em>, I have analyzed the following considerations relevant to your mark.`}</p>
-
-  ${data.dupontFactors ? data.dupontFactors.map(f => `
-  <p><strong>${f.factor}.</strong> ${f.analysis}</p>
-  `).join('') : ''}
-
-  <h2>III. Identified Conflicts</h2>
-  <p>${data.conflictsDiscussion || `The following marks present the most significant potential for conflict and warrant your attention prior to filing.`}</p>
-
-  <h2>IV. Conclusion and Recommendation</h2>
-  <p>${data.conclusion || `Based on the foregoing analysis, it is my opinion that the proposed mark "${mark.toUpperCase()}" presents a ${score >= 70 ? 'relatively low' : score >= 40 ? 'moderate' : 'elevated'} risk of refusal based on likelihood of confusion. ${data.recommendationText || ''}`}</p>
-
-  <p>${data.nextSteps || `I recommend proceeding ${score >= 70 ? 'with filing, subject to the caveats noted above' : 'cautiously, and suggest considering the alternative strategies discussed herein before filing'}. Please do not hesitate to contact me with any questions.`}</p>
-
-  <div class="letter-sig">
-    <p>Very truly yours,</p>
-    <div style="margin-top:2.5rem;border-top:1px solid #ccc;padding-top:.5rem;max-width:280px">
-      <div style="font-weight:700">${attyName}</div>
-      <div style="color:#444">${firmName}</div>
-    </div>
-  </div>
-
-  <div style="margin-top:2rem;padding:1rem;background:#f9f9f9;border:1px solid #eee;font-size:.8rem;color:#666;line-height:1.6">
-    <strong>DISCLAIMER:</strong> This opinion letter was drafted with AI assistance by Trademarkyo and is provided as a starting point only. The attorney of record is solely responsible for reviewing, verifying, and finalizing all content before delivery to the client. This draft does not constitute legal advice from Trademarkyo.
+  <div style="margin-bottom:1.5rem"><div style="font-weight:700">${clientName}</div></div>
+  <div class="letter-re">Re: Trademark Clearance Opinion — "${mark.toUpperCase()}"${classCode ? ` (${classLabel})` : ''}${matterNo ? ` | Matter No. ${matterNo}` : ''}</div>
+  ${bodyHTML}
+  <div style="margin-top:2rem;padding:1rem;background:#f9f9f9;border:1px solid #e0e0e0;font-size:.78rem;color:#777;line-height:1.6">
+    <strong>AI-ASSISTED DRAFT:</strong> This letter was drafted with AI assistance by Trademarkyo. The attorney of record is solely responsible for reviewing, editing, and finalizing all content before delivery. This draft does not constitute legal advice from Trademarkyo.
   </div>
 </div>`;
-
-  // Store plain text version for copy
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = letterHTML;
-  _opinionLetterHTML = letterHTML;
-  _opinionLetterText = tempDiv.innerText || tempDiv.textContent;
 
   document.getElementById('opinionBody').innerHTML = letterHTML;
 }
@@ -2383,185 +2369,6 @@ function downloadOpinionPDF() {
   doc.text('trademarkyo.com', W-M, 288, {align:'right'});
 
   doc.save(`Trademarkyo_OpinionLetter_${mark.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
-}
-
-/* ── CLIENT OPINION LETTER ── */
-let _letterText = '';
-
-function openLetterModal() {
-  if (!_currentAnalysis) return;
-  // Pre-fill date
-  const dateEl = document.getElementById('lfDate');
-  if (dateEl && !dateEl.value) {
-    dateEl.value = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  }
-  document.getElementById('letterPreviewSection').style.display = 'none';
-  document.getElementById('letterModal').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeLetterModal() {
-  document.getElementById('letterModal').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
-async function generateLetter() {
-  if (!_currentAnalysis || !_currentMark) return;
-
-  const firm = document.getElementById('lfFirm').value.trim() || '[Attorney / Firm Name]';
-  const client = document.getElementById('lfClient').value.trim() || '[Client Name]';
-  const date = document.getElementById('lfDate').value.trim() || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const address = document.getElementById('lfAddress').value.trim();
-
-  const previewSection = document.getElementById('letterPreviewSection');
-  const preview = document.getElementById('letterPreview');
-  const btn = document.getElementById('generateLetterBtn');
-
-  previewSection.style.display = 'block';
-  preview.innerHTML = '';
-  preview.className = '';
-  preview.appendChild((() => {
-    const w = document.createElement('div');
-    w.className = 'letter-spinner-wrap';
-    w.innerHTML = '<div class="letter-spinner"></div><div class="letter-spinner-text">Drafting opinion letter…</div>';
-    return w;
-  })());
-  btn.disabled = true;
-
-  const classLabel = _currentClass ? `International Class ${_currentClass}` : 'all classes';
-  const score = Number(_currentAnalysis.approvalScore || 0);
-  const verdict = (_currentAnalysis.verdict || '').toUpperCase();
-  const oaScore = Number(_currentAnalysis.officeActionScore || 0);
-  const oaBasisMap = {'2d':'§2(d) likelihood of confusion','2e_descriptive':'§2(e)(1) mere descriptiveness','2e_geographic':'§2(e)(2) primarily geographically descriptive','2e_surname':'§2(e)(4) primarily merely a surname','2e_ornamental':'§2(e) ornamental','none':'no significant refusal basis'};
-  const oaBasis = oaBasisMap[_currentAnalysis.officeActionBasis || 'none'];
-  const conflicts = (_currentAnalysis.conflictAnalysis || []);
-  const liveConflicts = conflicts.filter(c => String(c.status||'').toUpperCase().includes('LIVE'));
-  const highRisk = conflicts.filter(c => (c.riskLevel||'').toLowerCase() === 'high');
-  const risks = (_currentAnalysis.mainRisks || []).join('; ');
-
-  try {
-    const apiKey = null; // hits our own backend
-    const resp = await fetch('/api/letter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mark: _currentMark,
-        classCode: _currentClass,
-        firm, client, date, address,
-        approvalScore: score,
-        verdict,
-        oaScore,
-        oaBasis,
-        distinctiveness: _currentAnalysis.distinctiveness || '',
-        recommendation: _currentAnalysis.recommendation || '',
-        mainRisks: _currentAnalysis.mainRisks || [],
-        conflictCount: conflicts.length,
-        liveConflictCount: liveConflicts.length,
-        highRiskCount: highRisk.length,
-        conflictSummary: liveConflicts.slice(0, 5).map(c =>
-          `${c.markName || 'Unknown'} (Serial No. ${c.serialNumber || 'N/A'}, ${c.status || 'Live'}) — ${c.similarity || ''}`
-        ).join('\n'),
-        classLabel
-      })
-    });
-
-    if (!resp.ok) throw new Error(`Server error (${resp.status})`);
-    const data = await resp.json();
-    _letterText = data.letter || '';
-    preview.textContent = _letterText;
-  } catch (e) {
-    preview.textContent = `Error generating letter: ${e.message}\n\nPlease try again.`;
-  }
-
-  btn.disabled = false;
-  preview.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function copyLetter() {
-  if (!_letterText) return;
-  navigator.clipboard.writeText(_letterText).then(() => {
-    const btn = event.target.closest('button');
-    if (btn) {
-      const orig = btn.innerHTML;
-      btn.innerHTML = '✓ COPIED';
-      setTimeout(() => { btn.innerHTML = orig; }, 2000);
-    }
-  });
-}
-
-function downloadLetterPDF() {
-  if (!_letterText || !_currentMark) return;
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'letter' });
-  const W = 215.9, M = 25.4, CW = W - M * 2;
-  let y = 20;
-
-  // Thin black bar top
-  doc.setFillColor(0, 0, 0); doc.rect(0, 0, W, 4, 'F');
-  y = 18;
-
-  // Firm name
-  const firm = document.getElementById('lfFirm').value.trim() || 'Attorney / Firm Name';
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(0, 0, 0);
-  doc.text(firm.toUpperCase(), M, y); y += 6;
-
-  const address = document.getElementById('lfAddress').value.trim();
-  if (address) {
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-    doc.text(address, M, y); y += 5;
-  }
-
-  y += 4;
-  doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3); doc.line(M, y, W - M, y); y += 8;
-
-  // Re: line
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 0, 0);
-  doc.text(`Re: Trademark Clearance Opinion — ${_currentMark}`, M, y); y += 6;
-
-  const client = document.getElementById('lfClient').value.trim();
-  const date = document.getElementById('lfDate').value.trim();
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-  if (client) { doc.text(`Client: ${client}`, M, y); y += 5; }
-  if (date) { doc.text(`Date: ${date}`, M, y); y += 5; }
-  y += 6;
-
-  doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.2); doc.line(M, y, W - M, y); y += 8;
-
-  // Letter body
-  doc.setFont('times', 'normal'); doc.setFontSize(10); doc.setTextColor(0, 0, 0);
-  const paragraphs = _letterText.split('\n\n');
-  for (const para of paragraphs) {
-    if (!para.trim()) continue;
-    if (y > 250) { doc.addPage(); y = 20; }
-    const trimmed = para.trim();
-    // Detect section headers (all caps short lines)
-    if (trimmed === trimmed.toUpperCase() && trimmed.length < 80 && !trimmed.includes('.')) {
-      y += 3;
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
-      doc.text(trimmed, M, y);
-      doc.setFont('times', 'normal'); doc.setFontSize(10);
-      y += 6;
-    } else {
-      const lines = doc.splitTextToSize(trimmed, CW);
-      for (const line of lines) {
-        if (y > 262) { doc.addPage(); y = 20; }
-        doc.text(line, M, y); y += 5.5;
-      }
-      y += 4;
-    }
-  }
-
-  // Footer
-  const totalPages = doc.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p);
-    doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2); doc.line(M, 272, W - M, 272);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
-    doc.text('ATTORNEY-CLIENT PRIVILEGED — NOT FOR DISTRIBUTION', M, 278);
-    doc.text(`Page ${p} of ${totalPages}`, W - M, 278, { align: 'right' });
-  }
-
-  doc.save(`Opinion_Letter_${_currentMark.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
 function resetSearch() {
