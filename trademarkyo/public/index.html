@@ -809,6 +809,193 @@
   .copy-btn:hover { border-color: var(--text-secondary); color: var(--text); }
   .copy-btn.done { color: var(--green); border-color: var(--green); }
 
+  /* ── SAVED SEARCHES ────────────────────────────────────────────────────────── */
+  .save-btn {
+    background: transparent; border: 1px solid var(--border-md); color: var(--text-tertiary);
+    font-weight: 700; font-size: 0.7rem; letter-spacing: .14em; text-transform: uppercase;
+    padding: .55rem 1rem; cursor: pointer; transition: all .15s; font-family: inherit;
+    display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap;
+  }
+  .save-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .save-btn.saved { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+  .save-btn svg { width: 13px; height: 13px; }
+
+  .saved-panel { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--side-pad) 1.5rem; }
+  .saved-inner { border: 1px solid var(--border); background: var(--surface); }
+  .saved-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .85rem 1.25rem; border-bottom: 1px solid var(--border);
+  }
+  .saved-title {
+    font-weight: 700; font-size: 0.65rem; color: var(--accent);
+    letter-spacing: .2em; text-transform: uppercase; display: flex; align-items: center; gap: .5rem;
+  }
+  .saved-title::before { content: '★'; font-size: .7rem; }
+  .saved-clear {
+    background: none; border: none; font-weight: 700; font-size: 0.65rem;
+    color: var(--text-tertiary); letter-spacing: .15em; text-transform: uppercase;
+    cursor: pointer; font-family: inherit; transition: color .15s;
+  }
+  .saved-clear:hover { color: var(--red); }
+  .saved-list { display: flex; flex-wrap: wrap; gap: .5rem; padding: .85rem 1.25rem; }
+  .saved-item {
+    display: flex; align-items: center; gap: .6rem; background: var(--surface2);
+    border: 1px solid var(--border-md); padding: .5rem .9rem; cursor: pointer; transition: all .15s;
+  }
+  .saved-item:hover { border-color: var(--accent); }
+  .saved-item:hover .saved-item-mark { color: var(--accent); }
+  .saved-item-mark { font-weight: 700; font-size: 0.82rem; letter-spacing: .06em; transition: color .15s; }
+  .saved-item-meta { font-size: 0.7rem; color: var(--text-tertiary); }
+  .saved-item-score { font-weight: 700; font-size: 0.72rem; padding: .15rem .45rem; }
+  .saved-item-remove {
+    background: none; border: none; color: var(--text-tertiary); font-size: .85rem;
+    cursor: pointer; padding: 0 .1rem; transition: color .15s; line-height: 1; margin-left: .2rem;
+  }
+  .saved-item-remove:hover { color: var(--red); }
+
+  /* ── COMPARE MODE ───────────────────────────────────────────────────────────── */
+  #comparePanel {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 500;
+    background: var(--surface); border-top: 1px solid var(--border-md);
+    transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+  }
+  #comparePanel.open { transform: translateY(0); }
+  .compare-bar {
+    display: flex; align-items: center; gap: 1rem; padding: .75rem var(--side-pad);
+    flex-wrap: wrap;
+  }
+  .compare-bar-label {
+    font-weight: 700; font-size: 0.65rem; color: var(--text-secondary);
+    letter-spacing: .2em; text-transform: uppercase; white-space: nowrap;
+  }
+  .compare-slots { display: flex; gap: .5rem; flex: 1; flex-wrap: wrap; }
+  .compare-slot {
+    display: flex; align-items: center; gap: .5rem; background: var(--surface2);
+    border: 1px solid var(--border-md); padding: .4rem .85rem;
+    font-weight: 700; font-size: .8rem; letter-spacing: .04em;
+  }
+  .compare-slot-empty {
+    color: var(--text-tertiary); border-style: dashed; font-weight: 400; font-size: .75rem;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  .compare-slot-remove {
+    background: none; border: none; color: var(--text-tertiary); font-size: .85rem;
+    cursor: pointer; padding: 0; line-height: 1; transition: color .15s;
+  }
+  .compare-slot-remove:hover { color: var(--red); }
+  .compare-slot-score { font-size: .7rem; font-weight: 700; padding: .1rem .4rem; }
+  .btn-compare-run {
+    background: var(--accent); color: #000; border: none;
+    font-weight: 700; font-size: 0.75rem; letter-spacing: .18em; text-transform: uppercase;
+    padding: .65rem 1.5rem; cursor: pointer; transition: background .15s; white-space: nowrap;
+    font-family: inherit;
+  }
+  .btn-compare-run:hover { background: #fff; }
+  .btn-compare-run:disabled { background: var(--border-md); color: var(--text-tertiary); cursor: not-allowed; }
+  .btn-compare-clear {
+    background: transparent; border: 1px solid var(--border-md); color: var(--text-tertiary);
+    font-weight: 700; font-size: 0.7rem; letter-spacing: .14em; text-transform: uppercase;
+    padding: .6rem 1rem; cursor: pointer; transition: all .15s; font-family: inherit;
+  }
+  .btn-compare-clear:hover { border-color: var(--red); color: var(--red); }
+
+  /* Compare add button on result card */
+  .btn-add-compare {
+    background: transparent; border: 1px solid var(--border-md); color: var(--text-tertiary);
+    font-weight: 700; font-size: 0.7rem; letter-spacing: .14em; text-transform: uppercase;
+    padding: .55rem 1rem; cursor: pointer; transition: all .15s; font-family: inherit;
+    display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap;
+  }
+  .btn-add-compare:hover { border-color: var(--blue); color: var(--blue); }
+  .btn-add-compare.in-compare { color: var(--blue); border-color: var(--blue); background: rgba(77,184,255,.06); }
+  .btn-add-compare svg { width: 13px; height: 13px; }
+
+  /* ── COMPARE MODAL ──────────────────────────────────────────────────────────── */
+  #compareModal {
+    position: fixed; inset: 0; z-index: 8000; display: none;
+    align-items: flex-start; justify-content: center; padding: 2rem 1rem;
+    overflow-y: auto;
+  }
+  #compareModal.open { display: flex; }
+  .compare-modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.92); backdrop-filter: blur(8px);
+  }
+  .compare-modal-box {
+    position: relative; background: var(--surface); border: 1px solid var(--border-md);
+    width: 100%; max-width: 1100px; animation: slideUp .25s ease forwards;
+    margin: auto;
+  }
+  .compare-modal-box::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--blue), var(--accent), transparent);
+  }
+  .compare-modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.75rem 2rem; border-bottom: 1px solid var(--border);
+  }
+  .compare-modal-title { font-weight: 700; font-size: 1.1rem; text-transform: uppercase; letter-spacing: .04em; }
+  .compare-modal-sub { font-size: .85rem; color: var(--text-secondary); margin-top: .3rem; }
+  .compare-modal-close {
+    background: none; border: none; color: var(--text-tertiary); font-size: 1.2rem;
+    cursor: pointer; padding: .35rem; transition: color .15s;
+  }
+  .compare-modal-close:hover { color: var(--text); }
+  .compare-table-wrap { overflow-x: auto; padding: 1.5rem 2rem; }
+  .compare-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .compare-table th, .compare-table td {
+    padding: 1rem 1.25rem; border: 1px solid var(--border); text-align: left; vertical-align: top;
+  }
+  .compare-table th {
+    font-weight: 700; font-size: 0.62rem; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--text-secondary); background: var(--surface2); white-space: nowrap;
+  }
+  .compare-row-label {
+    font-weight: 700; font-size: 0.65rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--text-secondary); background: var(--surface2); white-space: nowrap; width: 160px;
+  }
+  .compare-mark-header {
+    font-weight: 700; font-size: 1.4rem; letter-spacing: .04em; text-transform: uppercase;
+    word-break: break-all;
+  }
+  .compare-score-big {
+    font-weight: 700; font-size: 2.5rem; line-height: 1; letter-spacing: -.02em;
+  }
+  .compare-winner-badge {
+    display: inline-block; background: var(--accent); color: #000;
+    font-weight: 700; font-size: .6rem; letter-spacing: .14em; text-transform: uppercase;
+    padding: .2rem .6rem; margin-top: .5rem;
+  }
+  .compare-verdict {
+    font-weight: 700; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; margin-top: .3rem;
+  }
+  .compare-cell-text { font-size: .875rem; color: var(--text-secondary); line-height: 1.6; }
+  .compare-risk-list { list-style: none; }
+  .compare-risk-list li {
+    font-size: .82rem; color: var(--text-secondary); padding: .2rem 0;
+    padding-left: 1rem; position: relative; line-height: 1.5;
+  }
+  .compare-risk-list li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); font-size: .7rem; }
+  .compare-loading { padding: 3rem 2rem; text-align: center; }
+  .compare-loading-spinner {
+    width: 28px; height: 28px; border: 2px solid var(--border-md);
+    border-top-color: var(--blue); border-radius: 50%;
+    animation: spin .75s linear infinite; margin: 0 auto 1rem;
+  }
+  .compare-loading-text { font-weight: 700; font-size: .8rem; color: var(--text-secondary); letter-spacing: .16em; text-transform: uppercase; }
+  .compare-loading-sub { font-size: .8rem; color: var(--text-tertiary); margin-top: .5rem; }
+
+  @media (max-width: 640px) {
+    .compare-bar { padding: .75rem var(--side-pad); gap: .75rem; }
+    .compare-table-wrap { padding: 1rem; }
+    .compare-row-label { width: 110px; font-size: .58rem; }
+    .compare-mark-header { font-size: 1.1rem; }
+    .compare-score-big { font-size: 2rem; }
+    #compareModal { padding: 0; align-items: flex-end; }
+    .compare-modal-box { max-height: 95vh; overflow-y: auto; }
+    .compare-modal-header { padding: 1.25rem; }
+    .compare-table-wrap { padding: 1rem .75rem; }
+  }
+
   /* ── FOOTER ─────────────────────────────────────────────────────────────────── */
   .disclaimer {
     font-size: 0.825rem; color: var(--text-secondary); line-height: 1.75;
@@ -962,6 +1149,37 @@
   </div>
 </div>
 
+<!-- COMPARE MODAL -->
+<div id="compareModal">
+  <div class="compare-modal-backdrop" onclick="closeCompareModal()"></div>
+  <div class="compare-modal-box">
+    <div class="compare-modal-header">
+      <div>
+        <div class="compare-modal-title">Side-by-Side Comparison</div>
+        <div class="compare-modal-sub" id="compareModalSub">Analyzing marks…</div>
+      </div>
+      <button class="compare-modal-close" onclick="closeCompareModal()">✕</button>
+    </div>
+    <div id="compareModalBody">
+      <div class="compare-loading">
+        <div class="compare-loading-spinner"></div>
+        <div class="compare-loading-text">Running Comparison</div>
+        <div class="compare-loading-sub">Scanning USPTO and analyzing each mark…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARE BAR (fixed bottom) -->
+<div id="comparePanel">
+  <div class="compare-bar">
+    <span class="compare-bar-label">Compare</span>
+    <div class="compare-slots" id="compareSlots"></div>
+    <button class="btn-compare-run" id="compareRunBtn" onclick="runComparison()" disabled>RUN COMPARISON →</button>
+    <button class="btn-compare-clear" onclick="clearCompare()">CLEAR</button>
+  </div>
+</div>
+
 <!-- MAIN APP -->
 <div id="appContent">
 
@@ -1065,6 +1283,16 @@
       <button class="history-clear" onclick="clearHistory()">CLEAR</button>
     </div>
     <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<div class="saved-panel" id="savedPanel" style="display:none">
+  <div class="saved-inner">
+    <div class="saved-header">
+      <span class="saved-title">Saved Searches</span>
+      <button class="saved-clear" onclick="clearSaved()">CLEAR ALL</button>
+    </div>
+    <div class="saved-list" id="savedList"></div>
   </div>
 </div>
 
@@ -1232,8 +1460,15 @@ document.addEventListener('DOMContentLoaded', () => {
     showDisclaimerIfNeeded();
   }
   document.getElementById('passInput').addEventListener('keypress', e => { if (e.key === 'Enter') checkPass(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  document.getElementById('markInput').addEventListener('keypress', e => { if (e.key === 'Enter') runScan(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeModal();
+      closeCompareModal();
+    }
+  });
   renderHistory();
+  renderSaved();
 });
 
 /* ── STATE ── */
@@ -1553,7 +1788,17 @@ function renderResults(mark, classCode, usptoData, analysis) {
     <div class="section-label">AI Recommendation</div>
     <div class="verdict-analysis">${analysis.recommendation||'No recommendation generated.'}</div>
     ${risksHTML ? `<div class="section-label" style="margin-top:1.5rem">Key Risk Factors</div>${risksHTML}` : ''}
-    <div class="section-label" style="margin-top:2rem;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border)">
+      <button class="save-btn" id="saveBtn" onclick="toggleSave('${mark}','${classCode}',${score},'${analysis.verdict||''}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span id="saveBtnLabel">${isSaved(mark,classCode)?'SAVED':'SAVE SEARCH'}</span>
+      </button>
+      <button class="btn-add-compare" id="addCompareBtn" onclick="addToCompare('${mark}','${classCode}',${score},'${analysis.verdict||''}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
+        <span id="addCompareBtnLabel">ADD TO COMPARE</span>
+      </button>
+    </div>
+    <div class="section-label" style="margin-top:1.5rem;justify-content:space-between">
       <span style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
         Conflict Analysis (${norm.length} marks reviewed)
         <span style="flex:1;height:1px;background:var(--border);display:block;min-width:20px"></span>
@@ -1576,6 +1821,15 @@ function renderResults(mark, classCode, usptoData, analysis) {
     if (b) b.style.width = score + '%';
     const ob = document.getElementById('oaBarFill');
     if (ob) ob.style.width = oaScore + '%';
+    // Set initial save button state
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn && isSaved(mark, classCode)) saveBtn.classList.add('saved');
+    // Set initial compare button state
+    const compareBtn = document.getElementById('addCompareBtn');
+    if (compareBtn && _compareQueue.some(q => q.mark === mark && q.classCode === classCode)) {
+      compareBtn.classList.add('in-compare');
+      document.getElementById('addCompareBtnLabel').textContent = 'IN COMPARISON';
+    }
   }, 150);
 }
 
@@ -2006,7 +2260,322 @@ function downloadDraftPDF() {
   doc.save(`Trademarkyo_Draft_${_currentMark.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
-document.getElementById('markInput').addEventListener('keypress', e => { if (e.key === 'Enter') runScan(); });
+/* ── SAVED SEARCHES (localStorage — persist across sessions) ── */
+const SAVED_KEY = 'tyo_saved';
+
+function getSaved() {
+  try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch { return []; }
+}
+
+function isSaved(mark, classCode) {
+  return getSaved().some(s => s.mark === mark && s.classCode === (classCode || ''));
+}
+
+function toggleSave(mark, classCode, score, verdict) {
+  let saved = getSaved();
+  const exists = saved.findIndex(s => s.mark === mark && s.classCode === (classCode || ''));
+  if (exists >= 0) {
+    saved.splice(exists, 1);
+  } else {
+    saved.unshift({ mark, classCode: classCode || '', score, verdict, ts: Date.now() });
+    if (saved.length > 50) saved = saved.slice(0, 50);
+  }
+  localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+
+  // Update button
+  const btn = document.getElementById('saveBtn');
+  const lbl = document.getElementById('saveBtnLabel');
+  if (btn && lbl) {
+    if (isSaved(mark, classCode)) {
+      btn.classList.add('saved');
+      lbl.textContent = 'SAVED';
+    } else {
+      btn.classList.remove('saved');
+      lbl.textContent = 'SAVE SEARCH';
+    }
+  }
+  renderSaved();
+}
+
+function renderSaved() {
+  const saved = getSaved();
+  const panel = document.getElementById('savedPanel');
+  const list = document.getElementById('savedList');
+  if (!panel || !list) return;
+  if (!saved.length) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  list.innerHTML = saved.map((s, i) => {
+    const sc = s.score >= 75 ? 'var(--green)' : s.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const classLabel = s.classCode ? ` · Class ${s.classCode}` : '';
+    return `<div class="saved-item" onclick="loadSavedSearch('${s.mark}','${s.classCode}')">
+      <span class="saved-item-mark">${s.mark}</span>
+      ${s.classCode ? `<span class="saved-item-meta">${classLabel}</span>` : ''}
+      <span class="saved-item-score" style="color:${sc};background:rgba(0,0,0,.3);border:1px solid ${sc}">${s.score}%</span>
+      <button class="saved-item-remove" onclick="event.stopPropagation();removeSaved(${i})" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function removeSaved(idx) {
+  const saved = getSaved();
+  saved.splice(idx, 1);
+  localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+  renderSaved();
+  // Refresh save button state if current mark matches
+  const btn = document.getElementById('saveBtn');
+  const lbl = document.getElementById('saveBtnLabel');
+  if (btn && lbl && _currentMark) {
+    if (isSaved(_currentMark, _currentClass)) {
+      btn.classList.add('saved'); lbl.textContent = 'SAVED';
+    } else {
+      btn.classList.remove('saved'); lbl.textContent = 'SAVE SEARCH';
+    }
+  }
+}
+
+function clearSaved() {
+  localStorage.removeItem(SAVED_KEY);
+  document.getElementById('savedPanel').style.display = 'none';
+  const btn = document.getElementById('saveBtn');
+  const lbl = document.getElementById('saveBtnLabel');
+  if (btn && lbl) { btn.classList.remove('saved'); lbl.textContent = 'SAVE SEARCH'; }
+}
+
+function loadSavedSearch(mark, classCode) {
+  unlockInputs();
+  document.getElementById('markInput').value = mark;
+  document.getElementById('classSelect').value = classCode || '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  setTimeout(() => runScan(), 200);
+}
+
+/* ── COMPARISON MODE ── */
+let _compareQueue = []; // [{mark, classCode, score, verdict}]
+
+function addToCompare(mark, classCode, score, verdict) {
+  const alreadyIn = _compareQueue.findIndex(q => q.mark === mark && q.classCode === (classCode || ''));
+  if (alreadyIn >= 0) {
+    // Remove from queue
+    _compareQueue.splice(alreadyIn, 1);
+    const btn = document.getElementById('addCompareBtn');
+    const lbl = document.getElementById('addCompareBtnLabel');
+    if (btn && lbl) { btn.classList.remove('in-compare'); lbl.textContent = 'ADD TO COMPARE'; }
+  } else {
+    if (_compareQueue.length >= 3) {
+      alert('You can compare up to 3 marks at once. Remove one first.');
+      return;
+    }
+    _compareQueue.push({ mark, classCode: classCode || '', score, verdict });
+    const btn = document.getElementById('addCompareBtn');
+    const lbl = document.getElementById('addCompareBtnLabel');
+    if (btn && lbl) { btn.classList.add('in-compare'); lbl.textContent = 'IN COMPARISON'; }
+  }
+  renderComparePanel();
+}
+
+function renderComparePanel() {
+  const panel = document.getElementById('comparePanel');
+  const slots = document.getElementById('compareSlots');
+  const runBtn = document.getElementById('compareRunBtn');
+  if (!panel || !slots) return;
+
+  if (_compareQueue.length === 0) {
+    panel.classList.remove('open');
+    return;
+  }
+  panel.classList.add('open');
+
+  const slotsHTML = _compareQueue.map((q, i) => {
+    const sc = q.score >= 75 ? 'var(--green)' : q.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const classLabel = q.classCode ? ` · Cl.${q.classCode}` : '';
+    return `<div class="compare-slot">
+      <span style="font-weight:700;font-size:.82rem;letter-spacing:.04em">${q.mark}</span>
+      <span style="font-size:.68rem;color:var(--text-tertiary)">${classLabel}</span>
+      <span class="compare-slot-score" style="color:${sc};background:rgba(0,0,0,.3);border:1px solid ${sc}">${q.score}%</span>
+      <button class="compare-slot-remove" onclick="removeFromCompare(${i})">✕</button>
+    </div>`;
+  }).join('');
+
+  // Empty slot placeholders
+  const empties = Array(3 - _compareQueue.length).fill(0).map(() =>
+    `<div class="compare-slot compare-slot-empty">+ Add mark</div>`
+  ).join('');
+
+  slots.innerHTML = slotsHTML + empties;
+  runBtn.disabled = _compareQueue.length < 2;
+}
+
+function removeFromCompare(idx) {
+  const removed = _compareQueue.splice(idx, 1)[0];
+  // If the removed mark is the currently displayed one, update its button
+  if (removed && _currentMark === removed.mark && _currentClass === (removed.classCode || '')) {
+    const btn = document.getElementById('addCompareBtn');
+    const lbl = document.getElementById('addCompareBtnLabel');
+    if (btn && lbl) { btn.classList.remove('in-compare'); lbl.textContent = 'ADD TO COMPARE'; }
+  }
+  renderComparePanel();
+}
+
+function clearCompare() {
+  _compareQueue = [];
+  renderComparePanel();
+  // Reset any in-compare button
+  const btn = document.getElementById('addCompareBtn');
+  const lbl = document.getElementById('addCompareBtnLabel');
+  if (btn && lbl) { btn.classList.remove('in-compare'); lbl.textContent = 'ADD TO COMPARE'; }
+}
+
+async function runComparison() {
+  if (_compareQueue.length < 2) return;
+  const modal = document.getElementById('compareModal');
+  const body = document.getElementById('compareModalBody');
+  const sub = document.getElementById('compareModalSub');
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const marks = _compareQueue.map(q => q.mark + (q.classCode ? ` (Class ${q.classCode})` : '')).join(', ');
+  sub.textContent = `Comparing: ${marks}`;
+
+  body.innerHTML = `<div class="compare-loading">
+    <div class="compare-loading-spinner"></div>
+    <div class="compare-loading-text">Running Comparison</div>
+    <div class="compare-loading-sub">Scanning USPTO and running AI analysis for each mark…</div>
+  </div>`;
+
+  try {
+    // Fetch full analysis for each queued mark (may already be cached server-side)
+    const results = await Promise.all(_compareQueue.map(async (q) => {
+      try {
+        const searchRes = await fetch(`${API_BASE}/api/search`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ markName: q.mark, classCode: q.classCode })
+        });
+        const searchData = await searchRes.json();
+        const usptoResults = Array.isArray(searchData.results) ? searchData.results : [];
+
+        const analysisRes = await fetch(`${API_BASE}/api/analyze`, {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ markName: q.mark, classCode: q.classCode, results: usptoResults })
+        });
+        const analysis = await analysisRes.json();
+        return { ...q, analysis, usptoTotal: usptoResults.length, error: null };
+      } catch (e) {
+        return { ...q, analysis: null, error: e.message };
+      }
+    }));
+
+    renderCompareTable(results);
+  } catch (e) {
+    body.innerHTML = `<div style="padding:2rem"><div class="error-box">Comparison failed: ${e.message}</div></div>`;
+  }
+}
+
+function renderCompareTable(results) {
+  const body = document.getElementById('compareModalBody');
+  const sub = document.getElementById('compareModalSub');
+
+  // Find winner (highest approval score)
+  const validResults = results.filter(r => r.analysis && !r.error);
+  const winnerScore = Math.max(...validResults.map(r => Number(r.analysis.approvalScore || 0)));
+  sub.textContent = `${results.length} marks analyzed — best candidate highlighted`;
+
+  // Build column headers
+  const colHeaders = results.map(r => {
+    const score = r.analysis ? Number(r.analysis.approvalScore || 0) : null;
+    const sc = score === null ? 'var(--text-tertiary)' : score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const verdict = r.analysis ? (r.analysis.verdict || '') : 'ERROR';
+    const isWinner = score !== null && score === winnerScore && validResults.length > 1;
+    const classLabel = r.classCode ? `<div style="font-size:.7rem;color:var(--text-tertiary);margin-top:.2rem;font-weight:400">Class ${r.classCode}</div>` : '';
+    return `<th style="text-align:center;min-width:180px">
+      <div class="compare-mark-header">${r.mark}</div>
+      ${classLabel}
+      ${r.error ? `<div style="color:var(--red);font-size:.8rem;margin-top:.5rem">Error: ${r.error}</div>` : `
+        <div class="compare-score-big" style="color:${sc};margin-top:.75rem">${score !== null ? score : '—'}</div>
+        <div class="compare-verdict" style="color:${sc}">${verdict.toUpperCase()}</div>
+        ${isWinner ? '<div class="compare-winner-badge">★ BEST CANDIDATE</div>' : ''}
+      `}
+    </th>`;
+  }).join('');
+
+  const row = (label, content) => `<tr>
+    <td class="compare-row-label">${label}</td>
+    ${content}
+  </tr>`;
+
+  // Approval score row
+  const approvalRow = row('Approval Score', results.map(r => {
+    if (r.error || !r.analysis) return `<td>—</td>`;
+    const score = Number(r.analysis.approvalScore || 0);
+    const sc = score >= 75 ? 'var(--green)' : score >= 50 ? 'var(--yellow)' : 'var(--red)';
+    return `<td style="text-align:center"><span style="font-weight:700;font-size:1.8rem;color:${sc}">${score}%</span></td>`;
+  }).join(''));
+
+  // Office action risk row
+  const oaRow = row('Office Action Risk', results.map(r => {
+    if (r.error || !r.analysis) return `<td>—</td>`;
+    const oa = Number(r.analysis.officeActionScore || 0);
+    const sc = oa >= 70 ? 'var(--red)' : oa >= 40 ? 'var(--yellow)' : 'var(--green)';
+    const basis = {'2d':'§2(d) Confusion','2e_descriptive':'§2(e) Descriptive','2e_geographic':'§2(e) Geographic','2e_surname':'§2(e) Surname','2e_ornamental':'§2(e) Ornamental','none':'Low Risk'}[r.analysis.officeActionBasis || 'none'] || 'Low Risk';
+    return `<td style="text-align:center"><span style="font-weight:700;font-size:1.4rem;color:${sc}">${oa}%</span><div class="compare-cell-text" style="margin-top:.3rem">${basis}</div></td>`;
+  }).join(''));
+
+  // Distinctiveness row
+  const distinctRow = row('Distinctiveness', results.map(r => {
+    if (r.error || !r.analysis) return `<td>—</td>`;
+    return `<td><div class="compare-cell-text">${r.analysis.distinctiveness || '—'}</div></td>`;
+  }).join(''));
+
+  // Records reviewed row
+  const recordsRow = row('Records Reviewed', results.map(r => {
+    if (r.error) return `<td>—</td>`;
+    return `<td style="text-align:center"><span style="font-weight:700;font-size:1.4rem">${r.usptoTotal || 0}</span></td>`;
+  }).join(''));
+
+  // Live conflicts row
+  const conflictsRow = row('Live Conflicts', results.map(r => {
+    if (r.error || !r.analysis) return `<td>—</td>`;
+    const live = (r.analysis.conflictAnalysis || []).filter(c => String(c.status||'').toUpperCase().includes('LIVE')).length;
+    const sc = live === 0 ? 'var(--green)' : live <= 2 ? 'var(--yellow)' : 'var(--red)';
+    return `<td style="text-align:center"><span style="font-weight:700;font-size:1.4rem;color:${sc}">${live}</span></td>`;
+  }).join(''));
+
+  // Top risks row
+  const risksRow = row('Top Risk Factors', results.map(r => {
+    if (r.error || !r.analysis) return `<td>—</td>`;
+    const risks = (r.analysis.mainRisks || []).slice(0, 3);
+    if (!risks.length) return `<td><div class="compare-cell-text" style="color:var(--green)">No major risks identified.</div></td>`;
+    return `<td><ul class="compare-risk-list">${risks.map(r => `<li>${r}</li>`).join('')}</ul></td>`;
+  }).join(''));
+
+  // Recommendation row
+  const recRow = row('AI Recommendation', results.map(r => {
+    if (r.error || !r.analysis) return `<td>—</td>`;
+    return `<td><div class="compare-cell-text">${r.analysis.recommendation || '—'}</div></td>`;
+  }).join(''));
+
+  body.innerHTML = `<div class="compare-table-wrap">
+    <table class="compare-table">
+      <thead><tr><th class="compare-row-label" style="background:var(--surface2)"></th>${colHeaders}</tr></thead>
+      <tbody>
+        ${approvalRow}
+        ${oaRow}
+        ${distinctRow}
+        ${recordsRow}
+        ${conflictsRow}
+        ${risksRow}
+        ${recRow}
+      </tbody>
+    </table>
+    <div style="margin-top:1.25rem;font-size:.8rem;color:var(--text-tertiary);line-height:1.6">
+      ★ Best Candidate = highest approval likelihood score. This is an AI estimate only — not legal advice. Consult a trademark attorney before filing.
+    </div>
+  </div>`;
+}
+
+function closeCompareModal() {
+  document.getElementById('compareModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
 
 function resetSearch() {
   unlockInputs();
